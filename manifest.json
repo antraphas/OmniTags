@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "OmniTags",
+  "version": "2.0",
+  "description": "Sugere tags para o FreshDesk com base no conteúdo do chat usando IA.",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.groq.com/*",
+    "https://openrouter.ai/*",
+    "https://*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*.myfreshworks.com/*"],
+      "js": ["tags_data.js", "content.js"],
+      "css": ["style.css"]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "OmniTags — Clique para abrir o painel"
+  }
+}

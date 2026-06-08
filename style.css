@@ -1,0 +1,124 @@
+/* Container principal */
+#freshdesk-tag-suggester {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border: 1px solid #e1e4e8;
+  z-index: 9999;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Modo inline injetado no painel */
+#freshdesk-tag-suggester.fts-inline {
+  width: 100%;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  display: flex !important;
+}
+
+/* Fallback invisível se não conseguiu ancorar */
+#freshdesk-tag-suggester.fts-floating {
+  display: none !important; 
+}
+
+/* Header */
+.fts-header {
+  background-color: #f5f7f9;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #12344d;
+  border-bottom: 1px solid #e1e4e8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Botão Ler Conversa */
+.fts-btn {
+  background-color: #12344d;
+  color: white;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.fts-btn:hover {
+  background-color: #0b2233;
+}
+
+.fts-btn:disabled {
+  background-color: #8da4b5;
+  cursor: not-allowed;
+}
+
+/* Grupo de botões */
+.fts-btn-group {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* Botão de aprendizado (cérebro) */
+.fts-btn-learn {
+  background-color: #e8eaed;
+  color: #12344d;
+  padding: 4px 6px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.fts-btn-learn:hover {
+  background-color: #dadce0;
+}
+
+/* Content area */
+.fts-content {
+  padding: 8px 14px;
+  overflow-y: auto;
+  max-height: 250px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+/* Estado vazio (ocupa as 3 colunas) */
+.fts-empty {
+  font-size: 12px;
+  color: #6a7c8a;
+  text-align: center;
+  padding: 10px 0;
+  font-style: italic;
+  grid-column: 1 / -1;
+}
+
+/* Item de Tag (clicável) */
+.fts-tag {
+  font-size: 11px;
+  color: #12344d;
+  font-weight: 500;
+  background-color: #e5f0f9;
+  padding: 6px 4px;
+  border-radius: 4px;
+  text-align: center;
+  cursor: pointer;
+  white-space: normal;
+  word-wrap: break-word;
+  transition: background-color 0.2s, color 0.2s;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fts-tag:hover {
+  background-color: #d0e4f5;
+  border-color: #bbd6ef;
+}

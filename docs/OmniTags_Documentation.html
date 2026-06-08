@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OmniTags - Documentação</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['Fira Code', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              400: '#60a5fa',
+              500: '#3b82f6',
+              600: '#2563eb',
+              900: '#1e3a8a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    /* Neon Smoky Blue Pulse Effect */
+    @keyframes neon-pulse {
+      0%, 100% {
+        text-shadow: 0 0 5px rgba(59, 130, 246, 0.2), 0 0 10px rgba(59, 130, 246, 0.4);
+      }
+      50% {
+        text-shadow: 0 0 10px rgba(59, 130, 246, 0.6), 0 0 20px rgba(59, 130, 246, 0.8), 0 0 30px rgba(59, 130, 246, 0.6);
+      }
+    }
+
+    .neon-link {
+      color: #93c5fd;
+      text-decoration: none;
+      font-weight: 700;
+      font-family: 'Fira Code', monospace;
+      animation: neon-pulse 3s infinite alternate;
+      transition: all 0.3s ease;
+      letter-spacing: -0.5px;
+    }
+
+    .neon-link:hover {
+      color: #ffffff;
+      text-shadow: 0 0 15px rgba(96, 165, 250, 0.9), 0 0 30px rgba(96, 165, 250, 0.9);
+    }
+    
+    .glass-card {
+      background: rgba(30, 41, 59, 0.4);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .gradient-text {
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    pre {
+      background: #0f172a !important;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      overflow-x: auto;
+      margin-top: 1rem;
+    }
+    code.code-block {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.85rem;
+    }
+    .token-keyword { color: #c678dd; }
+    .token-string { color: #98c379; }
+    .token-function { color: #61afef; }
+    .token-comment { color: #5c6370; font-style: italic; }
+  </style>
+</head>
+<body class="bg-[#0b1120] text-slate-300 font-sans antialiased selection:bg-brand-500/30 selection:text-white">
+
+  <!-- Background Pattern -->
+  <div class="fixed inset-0 z-[-1] opacity-[0.15]" style="background-image: radial-gradient(#475569 1px, transparent 1px); background-size: 24px 24px;"></div>
+
+  <!-- Header -->
+  <header class="sticky top-0 z-50 backdrop-blur-xl bg-[#0b1120]/80 border-b border-slate-800/80">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-500/20">
+          <i class="fa-solid fa-tags text-white text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-white tracking-tight">OmniTags</h1>
+          <p class="text-[10px] text-slate-400 font-medium tracking-widest uppercase">Suporte Anota.AI</p>
+        </div>
+      </div>
+      <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+        </span>
+        <span class="text-xs text-slate-300 font-medium">Versão em Desenvolvimento</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Layout -->
+  <main class="max-w-6xl mx-auto px-6 py-16 grid grid-cols-1 lg:grid-cols-12 gap-12 relative items-start">
+    
+    <!-- Left Column: Content -->
+    <div class="lg:col-span-8 space-y-16">
+      
+      <!-- Hero -->
+      <section>
+        <h2 class="text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-6 leading-[1.1]">
+          Copiloto Autônomo <br>
+          <span class="bg-gradient-to-r from-brand-400 to-indigo-400 gradient-text">
+            de Triagem e Categorização
+          </span>
+        </h2>
+        <p class="text-lg text-slate-400 leading-relaxed mb-6">
+          A extensão OmniTags foi desenvolvida para operar nativamente sobre o Freshdesk / Freshchat. O sistema analisa históricos inteiros de chats com clientes, interpreta nuances de contexto e injeta cirurgicamente as <strong>Tags</strong> correspondentes no CRM. 
+        </p>
+        <div class="flex items-center gap-3 text-sm font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 px-4 py-3 rounded-lg inline-flex">
+          <i class="fa-solid fa-bolt"></i> Elimina o trabalho repetitivo, reduz o AHT e mitiga erros de métricas.
+        </div>
+      </section>
+
+      <!-- NOVO: Estrutura de Arquivos -->
+      <section>
+        <h3 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+          <i class="fa-solid fa-folder-tree text-brand-400 text-xl"></i> Arquitetura de Módulos do Sistema
+        </h3>
+        <p class="text-slate-400 mb-6 leading-relaxed">
+          O ecossistema é modularizado para garantir segurança e separar a interface da lógica pesada:
+        </p>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div class="glass-card p-5 rounded-xl border-t-2 border-t-brand-500">
+            <h4 class="text-white font-bold mb-1 font-mono text-sm">manifest.json</h4>
+            <p class="text-sm text-slate-400">Declara as permissões e injeta o sistema apenas nos domínios do Freshdesk autorizados.</p>
+          </div>
+          <div class="glass-card p-5 rounded-xl border-t-2 border-t-emerald-500">
+            <h4 class="text-white font-bold mb-1 font-mono text-sm">tags.js</h4>
+            <p class="text-sm text-slate-400">O Dicionário Fonte. Armazena a matriz estrita de tags usadas na triagem da IA.</p>
+          </div>
+          <div class="glass-card p-5 rounded-xl border-t-2 border-t-purple-500">
+            <h4 class="text-white font-bold mb-1 font-mono text-sm">content.js</h4>
+            <p class="text-sm text-slate-400">O coração. Controla requisições HTTP, raspagem de DOM, "Modo Deus" e injeções de botões.</p>
+          </div>
+          <div class="glass-card p-5 rounded-xl border-t-2 border-t-orange-500">
+            <h4 class="text-white font-bold mb-1 font-mono text-sm">popup.html/js</h4>
+            <p class="text-sm text-slate-400">Dashboard gerencial com gráficos, gestão de chaves API e armazenamento local de métricas.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- NOVO: Tags.js (Fonte da verdade) -->
+      <section>
+        <h3 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+          <i class="fa-solid fa-database text-brand-400 text-xl"></i> A Fonte da Verdade
+        </h3>
+        <p class="text-slate-400 mb-4 leading-relaxed">
+          Para evitar que a IA alucine ou invente tags, a matriz do arquivo <code>tags.js</code> é despachada em todas as requisições, forçando o motor a cruzar o contexto do cliente apenas com valores oficiais.
+        </p>
+        <pre><code class="code-block"><span class="token-keyword">const</span> tagsData = [
+  <span class="token-string">"acesso-remoto"</span>,
+  <span class="token-string">"bug-pdv"</span>,
+  <span class="token-comment">// ... dezenas de tags corporativas</span>
+];
+
+<span class="token-comment">// O prompt é blindado no content.js:</span>
+<span class="token-keyword">var</span> regras = <span class="token-string">"CLASSIFIQUE USANDO EXCLUSIVAMENTE ESTAS TAGS: "</span> + tagsData.<span class="token-function">join</span>(<span class="token-string">", "</span>);</code></pre>
+      </section>
+
+      <!-- Architecture (V1 original) + Tech add-on -->
+      <section>
+        <h3 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+          <i class="fa-solid fa-network-wired text-brand-400 text-xl"></i> Motor em Cascata (Fallback Engine)
+        </h3>
+        <p class="text-slate-400 mb-6 leading-relaxed">
+          Para assegurar disponibilidade próxima a 100%, a arquitetura orquestra uma rede de LLMs. Se a latência exceder 30 segundos, o sistema aborta a requisição e pula silenciosamente para o próximo nó.
+        </p>
+        
+        <div class="grid sm:grid-cols-3 gap-4 mb-6">
+          <div class="glass-card p-5 rounded-xl">
+            <h4 class="text-white font-semibold mb-2 flex justify-between">Gemini <span class="text-xs text-slate-400">Google</span></h4>
+            <p class="text-xs text-slate-400">1 Milhão de tokens de contexto. Perfeito para chats massivos.</p>
+          </div>
+          <div class="glass-card p-5 rounded-xl">
+            <h4 class="text-white font-semibold mb-2 flex justify-between">Llama 3.3 <span class="text-xs text-slate-400">Meta</span></h4>
+            <p class="text-xs text-slate-400">Precisão lógica extrema via hubs descentralizados.</p>
+          </div>
+          <div class="glass-card p-5 rounded-xl">
+            <h4 class="text-white font-semibold mb-2 flex justify-between">LPU <span class="text-xs text-slate-400">Groq</span></h4>
+            <p class="text-xs text-slate-400">Inferência em hardware especializado. Respostas rápidas.</p>
+          </div>
+        </div>
+
+        <pre><code class="code-block"><span class="token-comment">// A lógica de sobrevivência (Timeout + Fallback):</span>
+<span class="token-keyword">async function</span> <span class="token-function">fetchWithTimeout</span>(resource, options) {
+  <span class="token-keyword">var</span> controller = <span class="token-keyword">new</span> <span class="token-function">AbortController</span>();
+  <span class="token-keyword">var</span> id = <span class="token-function">setTimeout</span>(() => controller.<span class="token-function">abort</span>(), <span class="token-string">30000</span>); <span class="token-comment">// 30s max</span>
+  options.signal = controller.signal;
+  <span class="token-comment">// ... caso a API trave, o 'catch' passa pro próximo provedor</span>
+}</code></pre>
+      </section>
+
+      <!-- Privacy (V1 original) + Tech add-on -->
+      <section>
+        <h3 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+          <i class="fa-solid fa-shield-halved text-brand-400 text-xl"></i> Privacidade e Minificação (LGPD)
+        </h3>
+        <ul class="space-y-4 text-slate-300 mb-6">
+          <li class="flex gap-3">
+            <i class="fa-solid fa-check text-emerald-500 mt-1"></i>
+            <span><strong>Censura LGPD:</strong> Expressões Regulares localizam e suprimem CPFs, CNPJs, e-mails, CEPs, números de cartão e telefones.</span>
+          </li>
+          <li class="flex gap-3">
+            <i class="fa-solid fa-check text-emerald-500 mt-1"></i>
+            <span><strong>Compressão Estrutural:</strong> Metadados inúteis e jargões são apagados, compactando a "essência" da conversa.</span>
+          </li>
+        </ul>
+        <pre><code class="code-block"><span class="token-keyword">function</span> <span class="token-function">censorText</span>(text) {
+  <span class="token-comment">// Oculta e-mails e CPFs para proteção de dados do cliente</span>
+  text = text.<span class="token-function">replace</span>(<span class="token-keyword">/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g</span>, <span class="token-string">'[EMAIL]'</span>);
+  text = text.<span class="token-function">replace</span>(<span class="token-keyword">/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g</span>, <span class="token-string">'[CPF]'</span>);
+  <span class="token-keyword">return</span> text;
+}</code></pre>
+      </section>
+
+      <!-- God Mode (V1 original) + Tech add-on -->
+      <section>
+        <h3 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+          <i class="fa-solid fa-eye text-brand-400 text-xl"></i> Modo Deus (Extração Visual Absoluta)
+        </h3>
+        <p class="text-slate-400 mb-6 leading-relaxed">
+          Sistemas modernos de CRM ocultam variáveis via <em>Shadow DOM</em>. Para burlar isso, a rotina de auditoria do OmniTags apela para a visualização gráfica.
+        </p>
+        <div class="glass-card p-6 rounded-xl border border-slate-700/50 mb-6">
+          <ul class="space-y-3 text-sm text-slate-300">
+            <li class="flex items-start gap-3">
+              <i class="fa-solid fa-arrow-right text-brand-400 mt-1"></i>
+              <span>Lê os pixels da tela através da propriedade nativa <code class="text-brand-400 bg-slate-900 px-1 py-0.5 rounded border border-slate-700">innerText</code>.</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <i class="fa-solid fa-arrow-right text-brand-400 mt-1"></i>
+              <span>Ignora completamente as tags escondidas em menus suspensos não selecionados.</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <i class="fa-solid fa-arrow-right text-brand-400 mt-1"></i>
+              <span>Compara o que foi "desenhado" na tela contra o <code>tagsData</code> para homologar a tag perfeita.</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- RLHF (V1 original Timeline) + Tech add-on -->
+      <section>
+        <h3 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+          <i class="fa-solid fa-brain text-brand-400 text-xl"></i> Feedback Loop de Reforço (🧠)
+        </h3>
+        <p class="text-slate-400 mb-6 leading-relaxed">
+          O RLHF (Reinforcement Learning from Human Feedback) calibra a IA baseada nas suas decisões de triagem diárias. Os dados salvos localmente influenciam os pesos semânticos nos futuros chats.
+        </p>
+        <div class="border-l-2 border-slate-700 pl-6 space-y-6 relative mb-8">
+          <div class="absolute w-3 h-3 rounded-full bg-brand-500 -left-[7px] top-1"></div>
+          <div>
+            <h4 class="text-white font-medium mb-1">Passo 1: Predição</h4>
+            <p class="text-sm text-slate-400">A máquina propõe a tag errada <span class="text-white font-mono bg-slate-800 px-1 rounded">Y</span>.</p>
+          </div>
+          <div class="absolute w-3 h-3 rounded-full bg-brand-500 -left-[7px] top-[74px]"></div>
+          <div>
+            <h4 class="text-white font-medium mb-1">Passo 2: Intervenção Humana</h4>
+            <p class="text-sm text-slate-400">Você apaga a <span class="text-white font-mono bg-slate-800 px-1 rounded">Y</span> e injeta a <span class="text-white font-mono bg-slate-800 px-1 rounded">Z</span>.</p>
+          </div>
+          <div class="absolute w-3 h-3 rounded-full bg-emerald-500 -left-[7px] top-[148px]"></div>
+          <div>
+            <h4 class="text-white font-medium mb-1">Passo 3: Salvar Aprendizado</h4>
+            <p class="text-sm text-slate-400">O Modo Deus lê a tela e armazena o Delta (erro vs. acerto) no <code>chrome.storage.local</code> sob o vetor <code>learningData</code>.</p>
+          </div>
+        </div>
+        <pre><code class="code-block"><span class="token-comment">// Como o Cérebro turbina o próximo prompt:</span>
+<span class="token-keyword">var</span> dossie = <span class="token-string">"No passado, o humano corrigiu a sugestão Y para Z neste contexto."</span>;
+<span class="token-comment">// Esse Dossiê Histórico força o LLM a não cometer o mesmo erro corporativo.</span></code></pre>
+      </section>
+
+    </div>
+
+    <!-- Right Column: Sticky Sidebar (V1 original) -->
+    <div class="lg:col-span-4 relative hidden lg:block">
+      <div class="sticky top-28 space-y-8">
+        
+        <!-- UI Card -->
+        <div class="glass-card p-6 rounded-2xl">
+          <h4 class="text-white font-bold mb-4 uppercase tracking-wider text-xs flex justify-between items-center">
+            Módulos de Interface
+            <i class="fa-solid fa-layer-group text-slate-500"></i>
+          </h4>
+          <div class="space-y-4">
+            <div>
+              <h5 class="text-sm font-semibold text-brand-400 mb-1">Widget Injetável</h5>
+              <p class="text-xs text-slate-400 leading-relaxed">Instalado no Freshdesk. Contém um "Mini-Console Flutuante" que exibe logs de rede (Ex: <code class="bg-slate-800 text-white px-1 py-0.5 rounded">⏱ 2.4s</code>).</p>
+            </div>
+            <div class="h-px bg-slate-800 w-full"></div>
+            <div>
+              <h5 class="text-sm font-semibold text-brand-400 mb-1">Painel de Comando</h5>
+              <p class="text-xs text-slate-400 leading-relaxed">Extensão no Chrome. Exibe contagem de tokens, Acurácia %, gestão de Modelos On/Off e Backup de Dados JSON.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- SOP Card -->
+        <div class="bg-gradient-to-br from-brand-900/40 to-slate-900 border border-brand-500/20 p-6 rounded-2xl relative overflow-hidden shadow-2xl shadow-brand-900/20">
+          <div class="absolute -right-4 -top-4 text-brand-500/10 text-6xl">
+            <i class="fa-solid fa-list-check"></i>
+          </div>
+          <h4 class="text-white font-bold mb-4 uppercase tracking-wider text-xs relative z-10">
+            SOP de Operação Padrão
+          </h4>
+          <ul class="space-y-4 relative z-10">
+            <li class="flex gap-3 items-start">
+              <span class="w-5 h-5 rounded bg-brand-500/20 text-brand-400 flex items-center justify-center text-[10px] font-bold mt-0.5 border border-brand-500/30">1</span>
+              <span class="text-xs text-slate-300">Audite rapidamente o contexto do chat com o cliente.</span>
+            </li>
+            <li class="flex gap-3 items-start">
+              <span class="w-5 h-5 rounded bg-brand-500/20 text-brand-400 flex items-center justify-center text-[10px] font-bold mt-0.5 border border-brand-500/30">2</span>
+              <span class="text-xs text-slate-300">No painel direito, clique no botão <strong>Ler Conversa</strong>.</span>
+            </li>
+            <li class="flex gap-3 items-start">
+              <span class="w-5 h-5 rounded bg-brand-500/20 text-brand-400 flex items-center justify-center text-[10px] font-bold mt-0.5 border border-brand-500/30">3</span>
+              <span class="text-xs text-slate-300">Clique nas pílulas azuis sugeridas para efetuar a injeção nativa no CRM.</span>
+            </li>
+            <li class="flex gap-3 items-start">
+              <span class="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-bold mt-0.5 border border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.3)]">4</span>
+              <span class="text-xs text-slate-300">Finalize clicando no <strong>Ícone do Cérebro (🧠)</strong> para consolidar a precisão no banco local.</span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800/80 bg-[#070b15] mt-8">
+    <div class="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
+      
+      <div class="flex items-center gap-4">
+        <div class="w-10 h-10 rounded-lg bg-slate-800/80 border border-slate-700/50 flex items-center justify-center shadow-inner">
+          <i class="fa-solid fa-code text-slate-400 text-sm"></i>
+        </div>
+        <div>
+          <p class="text-slate-300 text-sm font-semibold tracking-wide">SYSTEM ARCHITECTURE</p>
+          <p class="text-slate-500 text-[11px] font-mono mt-0.5">Build v2.0 // Enterprise Tagging Node</p>
+        </div>
+      </div>
+      
+      <div class="text-center md:text-right">
+        <div class="text-slate-400 text-sm mb-1.5 font-medium">
+          Desenvolvido por 
+          <a href="https://www.raphaelsuarez.com.br" target="_blank" class="neon-link text-lg mx-1.5 font-mono">&lt;Raphael Suarez/&gt;</a>
+        </div>
+        <div class="text-[10px] tracking-widest uppercase text-slate-500 font-bold bg-slate-800/50 px-2 py-1 rounded inline-block border border-slate-700/50">Assistente de Experiência Júnior</div>
+      </div>
+
+    </div>
+  </footer>
+
+</body>
+</html>
