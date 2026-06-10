@@ -165,17 +165,13 @@ function readCurrentTagsFromField() {
   var formControls = deepQueryAll(document, 'fw-form-control, fw-select');
   var tagsFieldSelect = null;
 
-  // 1. Encontra o campo correto de Tags
   for (var i = 0; i < formControls.length; i++) {
     var el = formControls[i];
     var isTags = false;
-    
     var name = el.getAttribute('name');
     if (name && name.toLowerCase().includes('tag')) isTags = true;
-    
     var testId = el.getAttribute('data-test-id');
     if (testId && testId.toLowerCase().includes('tag')) isTags = true;
-    
     if (el.shadowRoot) {
       var label = el.shadowRoot.querySelector('label');
       if (label && label.textContent.toLowerCase().includes('tag')) isTags = true;
@@ -195,46 +191,45 @@ function readCurrentTagsFromField() {
   var extracted = [];
 
   if (tagsFieldSelect) {
-    // 2. Tenta propriedade genérica "value"
     var val = tagsFieldSelect.value;
     if (val && Array.isArray(val) && val.length > 0) {
       extracted = val.map(function(v) { return typeof v === 'object' ? (v.value || v.text || v.name) : v; });
       if (extracted.length > 0) return extracted;
     }
 
-    // 3. Extração Visual God Mode Seguro (Ignora o Dropdown oculto usando innerText)
-    // innerText captura apenas o que é VÍSIVEL na tela (display: none do dropdown é ignorado)
+    if (tagsFieldSelect.shadowRoot) {
+       var innerTags = deepQueryAll(tagsFieldSelect.shadowRoot, 'fw-tag');
+       innerTags.forEach(function(t) {
+         var text = (t.text || t.value || t.textContent || t.innerText || '').trim().replace(/×|✕|x$/gi, '').trim();
+         if (text && extracted.indexOf(text) === -1) {
+            extracted.push(text);
+         }
+       });
+       if (extracted.length > 0) return extracted;
+    }
+
     var visibleText = tagsFieldSelect.innerText || '';
     if (!visibleText && tagsFieldSelect.shadowRoot) {
        visibleText = tagsFieldSelect.shadowRoot.host.innerText || '';
     }
-
     if (visibleText && typeof tagsData !== 'undefined') {
-       // Ordenamos por tamanho decrescente para evitar "falsos positivos" de substrings
-       // Ex: Se "suporte-configurações" e "suporte" existirem, ele acha a maior primeiro.
        var sortedTags = tagsData.slice().sort(function(a, b) { return b.name.length - a.name.length; });
-       
        sortedTags.forEach(function(tagObj) {
           var tagName = tagObj.name;
-          // Se a tag visível aparece no texto desenhado na tela
           if (visibleText.indexOf(tagName) !== -1) {
-             // Remove o texto encontrado para não dar match duplo
              visibleText = visibleText.replace(tagName, '');
              if (extracted.indexOf(tagName) === -1) extracted.push(tagName);
           }
        });
     }
-    
     if (extracted.length > 0) return extracted;
   }
 
-  // 4. Fallbacks Clássicos em caso de falha total do componente (Pega elementos de tag legados)
   var allFwTags = deepQueryAll(document, 'fw-tag');
   if (allFwTags.length > 0) {
     var fallbackTags = [];
     allFwTags.forEach(function(t) {
-      // Aqui podemos usar textContent porque se fw-tag existe na tela, é pq foi renderizado
-      var text = t.textContent.trim().replace(/×|✕|x$/gi, '').trim();
+      var text = (t.text || t.value || t.textContent || t.innerText || '').trim().replace(/×|✕|x$/gi, '').trim();
       if (text.length > 0) fallbackTags.push(text);
     });
     if (fallbackTags.length > 0) return fallbackTags;
@@ -264,7 +259,7 @@ function saveLearningData(chatSummary, suggestedTags, actualTags) {
     timestamp: Date.now()
   };
 
-  console.log('[OmniTags] Salvando aprendizado:', entry);
+  console.log('[OmniTag] Salvando aprendizado:', entry);
 
   chrome.storage.local.get(['learningData', 'omnitagsMetrics'], function(result) {
     var data = result.learningData || [];
@@ -285,7 +280,7 @@ function saveLearningData(chatSummary, suggestedTags, actualTags) {
       data = data.slice(data.length - 500);
     }
     chrome.storage.local.set({ learningData: data, omnitagsMetrics: metrics }, function() {
-      console.log('[OmniTags] Aprendizado e métricas salvas! Total:', data.length);
+      console.log('[OmniTag] Aprendizado e métricas salvas! Total:', data.length);
     });
   });
 }
@@ -405,7 +400,7 @@ async function callOpenAIFormat(chatText, apiKey, learningData, provider, model,
   };
   if (provider === 'openrouter') {
     headers["HTTP-Referer"] = "https://github.com/omnitags";
-    headers["X-Title"] = "OmniTags Extension";
+    headers["X-Title"] = "OmniTag Extension";
   }
 
   var body = {
@@ -429,10 +424,12 @@ async function callOpenAIFormat(chatText, apiKey, learningData, provider, model,
   var match = aiText.match(/\[.*\]/s);
   if (match) aiText = match[0];
 
-  var tokens = data.usage ? (data.usage.prompt_tokens + data.usage.completion_tokens) : 0;
-  trackUsageMetrics(provider, model, tokens, chatText);
+  var tokens = data.usage ? (data.usage.prompt_tokens + data.usage.completion_tokens) : Math.round((chatText.length + aiText.length) / 4);
   
-  return mapNamesToTags(JSON.parse(aiText));
+  return {
+    tags: mapNamesToTags(JSON.parse(aiText)),
+    tokens: tokens
+  };
 }
 
 async function callGemini(chatText, apiKey, learningData, model) {
@@ -453,34 +450,11 @@ async function callGemini(chatText, apiKey, learningData, model) {
   // Estimate tokens for free Gemini (1 token ~ 4 chars of prompt + response)
   var textResponse = data.candidates[0].content.parts[0].text;
   var estimatedTokens = Math.round((chatText.length + textResponse.length) / 4);
-  trackUsageMetrics('gemini', model, estimatedTokens, chatText);
 
-  return mapNamesToTags(JSON.parse(textResponse));
-}
-
-function trackUsageMetrics(provider, model, tokens, chatText) {
-  chrome.storage.local.get(['omnitagsMetrics'], function(result) {
-    var metrics = result.omnitagsMetrics || {};
-    
-    var signature = minifyChatText(chatText).substring(0, 100);
-    metrics.analyzedChats = metrics.analyzedChats || [];
-    
-    if (!metrics.analyzedChats.includes(signature)) {
-      metrics.analyzedChats.push(signature);
-      if (metrics.analyzedChats.length > 500) metrics.analyzedChats.shift();
-      metrics.totalChats = (metrics.totalChats || 0) + 1;
-    }
-    
-    metrics.totalTokens = (metrics.totalTokens || 0) + tokens;
-    
-    metrics.tokensByProvider = metrics.tokensByProvider || {};
-    metrics.tokensByProvider[provider] = (metrics.tokensByProvider[provider] || 0) + tokens;
-    
-    metrics.lastProvider = provider;
-    metrics.lastModel = model;
-
-    chrome.storage.local.set({ omnitagsMetrics: metrics });
-  });
+  return {
+    tags: mapNamesToTags(JSON.parse(textResponse)),
+    tokens: estimatedTokens
+  };
 }
 
 var ftsStartTime = 0;
@@ -500,7 +474,7 @@ function logToConsole(msg, isError, isWarning) {
     header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 8px; margin-bottom: 8px;';
     
     var title = document.createElement('div');
-    title.innerHTML = '<strong>🧠 OmniTags AI</strong>';
+    title.innerHTML = '<strong>🧠 OmniTag AI</strong>';
     title.style.color = '#fff';
     
     timerDiv = document.createElement('div');
@@ -543,7 +517,7 @@ function logToConsole(msg, isError, isWarning) {
   }
 }
 
-function stopConsoleTimer() {
+function stopConsoleTimer(usageData) {
   if (ftsTimerInterval) clearInterval(ftsTimerInterval);
   var elapsed = ((Date.now() - ftsStartTime) / 1000).toFixed(1);
   var timerDiv = document.getElementById('fts-timer');
@@ -555,6 +529,31 @@ function stopConsoleTimer() {
   chrome.storage.local.get(['omnitagsMetrics'], function(result) {
     var metrics = result.omnitagsMetrics || {};
     metrics.lastTime = elapsed;
+    
+    if (usageData) {
+      var provider = usageData.provider;
+      var model = usageData.model;
+      var tokens = usageData.tokens;
+      var chatText = usageData.chatText;
+      
+      var signature = minifyChatText(chatText).substring(0, 100);
+      metrics.analyzedChats = metrics.analyzedChats || [];
+      
+      if (!metrics.analyzedChats.includes(signature)) {
+        metrics.analyzedChats.push(signature);
+        if (metrics.analyzedChats.length > 500) metrics.analyzedChats.shift();
+        metrics.totalChats = (metrics.totalChats || 0) + 1;
+      }
+      
+      metrics.totalTokens = (metrics.totalTokens || 0) + tokens;
+      
+      metrics.tokensByProvider = metrics.tokensByProvider || {};
+      metrics.tokensByProvider[provider] = (metrics.tokensByProvider[provider] || 0) + tokens;
+      
+      metrics.lastProvider = provider;
+      metrics.lastModel = model;
+    }
+    
     chrome.storage.local.set({ omnitagsMetrics: metrics });
   });
 
@@ -564,12 +563,10 @@ function stopConsoleTimer() {
   }, 1500);
 }
 
-async function executeAIFallback(chatText, apiKeys, primaryProvider, learningData, customProviders, customModels) {
+async function executeAIFallback(chatText, apiKeys, enabledProviders, learningData, customProviders, customModels) {
   var queue = [];
-  
-  logToConsole("Iniciando motor OmniTags de IA...");
+  logToConsole("Iniciando motor OmniTag de IA...");
 
-  // Merge Providers
   var ALL_PROVIDERS = JSON.parse(JSON.stringify(PROVIDER_MODELS));
   var providerURLs = {};
   
@@ -585,27 +582,30 @@ async function executeAIFallback(chatText, apiKeys, primaryProvider, learningDat
     });
   }
   
-  // 1. Enfileira todos os modelos do provedor principal
-  if (primaryProvider && apiKeys[primaryProvider] && ALL_PROVIDERS[primaryProvider]) {
-    ALL_PROVIDERS[primaryProvider].forEach(function(m) {
-      if (!m.startsWith('!')) {
-        queue.push({ provider: primaryProvider, model: m, key: apiKeys[primaryProvider], url: providerURLs[primaryProvider] });
-      }
-    });
-  }
-  
-  // 2. Enfileira os modelos dos outros provedores disponíveis
+  // Define priority order
+  var order = ['gemini', 'groq', 'openrouter'];
   Object.keys(ALL_PROVIDERS).forEach(function(p) {
-    if (p !== primaryProvider && apiKeys[p]) {
+    if (order.indexOf(p) === -1) order.push(p);
+  });
+
+  order.forEach(function(p) {
+    if (enabledProviders && enabledProviders[p] === false) return; // skipped because disabled
+    var keys = apiKeys[p];
+    if (!keys || (Array.isArray(keys) && keys.length === 0)) return;
+    if (!Array.isArray(keys)) keys = [keys];
+
+    if (ALL_PROVIDERS[p]) {
       ALL_PROVIDERS[p].forEach(function(m) {
         if (!m.startsWith('!')) {
-          queue.push({ provider: p, model: m, key: apiKeys[p], url: providerURLs[p] });
+          // Enqueue for each available key
+          keys.forEach(function(key) {
+            queue.push({ provider: p, model: m, key: key, url: providerURLs[p] });
+          });
         }
       });
     }
   });
 
-  // Filtro Inteligente de Contexto
   var minifiedLen = minifyChatText(chatText).length;
   if (minifiedLen > 12000) {
     queue = queue.filter(function(step) {
@@ -615,17 +615,17 @@ async function executeAIFallback(chatText, apiKeys, primaryProvider, learningDat
   }
 
   if (queue.length === 0) {
-    logToConsole("Erro: Nenhum modelo na fila. Verifique chaves.", true);
+    logToConsole("Erro: Nenhum modelo/chave habilitada.", true);
     throw new Error("NO_KEYS");
   }
 
-  logToConsole(queue.length + " modelos enfileirados em cascata.");
-
+  logToConsole(queue.length + " chamadas possiveis enfileiradas.");
   var lastError = null;
   
   for (var i = 0; i < queue.length; i++) {
     var step = queue[i];
-    logToConsole("Chamando [" + step.provider + "] -> " + step.model);
+    var maskedKey = typeof step.key === 'string' ? (step.key.substring(0,6) + '...') : '...';
+    logToConsole("Chamando [" + step.provider + "] -> " + step.model + " (" + maskedKey + ")");
     try {
       var res;
       if (step.provider === 'gemini') {
@@ -634,18 +634,22 @@ async function executeAIFallback(chatText, apiKeys, primaryProvider, learningDat
         res = await callOpenAIFormat(chatText, step.key, learningData, step.provider, step.model, step.url);
       }
       logToConsole("SUCESSO: Recebeu resposta de " + step.provider + "!");
-      return res;
+      return {
+        tags: res.tags,
+        provider: step.provider,
+        model: step.model,
+        tokens: res.tokens
+      };
     } catch (err) {
       if (err.name === 'AbortError') {
-         logToConsole("TIMEOUT: O provedor " + step.provider + " demorou mais que 30s.", true);
+         logToConsole("TIMEOUT: O provedor " + step.provider + " demorou.", true);
       } else {
          logToConsole("FALHA: " + err.message, true);
       }
       lastError = err;
     }
   }
-  
-  logToConsole("Todos os modelos falharam.", true);
+  logToConsole("Todas as tentativas falharam.", true);
   throw lastError || new Error("ALL_MODELS_FAILED");
 }
 
@@ -720,26 +724,31 @@ function createUI() {
     var safeText = censorText(rawText);
     lastChatSummary = safeText;
 
-    chrome.storage.local.get(['apiKeys', 'primaryProvider', 'learningData', 'customProviders', 'customModels'], async function(result) {
+        chrome.storage.local.get(['apiKeys', 'enabledProviders', 'learningData', 'customProviders', 'customModels'], async function(result) {
       var apiKeys = result.apiKeys || {};
-      var primary = result.primaryProvider || 'groq';
+      var enabledProviders = result.enabledProviders || { gemini: true, groq: true, openrouter: true };
       
       if (Object.keys(apiKeys).length > 0) {
         try {
-          var suggestions = await executeAIFallback(safeText, apiKeys, primary, result.learningData, result.customProviders, result.customModels);
-          stopConsoleTimer();
+          var aiResult = await executeAIFallback(safeText, apiKeys, enabledProviders, result.learningData, result.customProviders, result.customModels);
+          stopConsoleTimer({
+            provider: aiResult.provider,
+            model: aiResult.model,
+            tokens: aiResult.tokens,
+            chatText: safeText
+          });
           
           // Deixa o console visível por 1.5s para o usuário ver o tempo final, depois mostra as tags
           setTimeout(function() {
-             lastSuggestedTags = suggestions;
-             updateUI(suggestions, false, false, false);
+             lastSuggestedTags = aiResult.tags;
+             updateUI(aiResult.tags, false, false, false);
              var learnBtn = document.getElementById('fts-btn-aprender');
              if (learnBtn) learnBtn.style.display = 'inline-block';
              resetBtn(btn);
           }, 1500);
 
         } catch (err) {
-          console.error("[OmniTags] Todas as IAs falharam:", err);
+          console.error("[OmniTag] Todas as IAs falharam:", err);
           stopConsoleTimer();
           
           setTimeout(function() {
@@ -751,6 +760,7 @@ function createUI() {
           }, 2000);
         }
       } else {
+        stopConsoleTimer();
         var fallback2 = scoreTagsFallback(safeText, result.learningData);
         lastSuggestedTags = fallback2;
         updateUI(fallback2, false, true, false);
@@ -761,13 +771,13 @@ function createUI() {
 
   btnLearn.addEventListener('click', function() {
     var actualTags = readCurrentTagsFromField();
-    console.log('[OmniTags] Tags lidas do campo:', actualTags);
-    console.log('[OmniTags] Chat summary disponível:', lastChatSummary ? lastChatSummary.substring(0, 80) + '...' : '(vazio)');
+    console.log('[OmniTag] Tags lidas do campo:', actualTags);
+    console.log('[OmniTag] Chat summary disponível:', lastChatSummary ? lastChatSummary.substring(0, 80) + '...' : '(vazio)');
     
     if (actualTags.length === 0) {
       btnLearn.textContent = '\u274C';
       btnLearn.title = 'Nenhuma tag encontrada no campo de Tags do Freshdesk.';
-      console.warn('[OmniTags] Nenhuma tag lida do campo! Verifique se há tags inseridas.');
+      console.warn('[OmniTag] Nenhuma tag lida do campo! Verifique se há tags inseridas.');
       setTimeout(function() { btnLearn.textContent = '\uD83E\uDDE0'; btnLearn.title = 'Salvar Aprendizado'; }, 3000);
       return;
     }
@@ -775,7 +785,7 @@ function createUI() {
     if (!lastChatSummary || lastChatSummary.trim().length < 10) {
       btnLearn.textContent = '\u274C';
       btnLearn.title = 'Clique em Ler Conversa antes de salvar o aprendizado.';
-      console.warn('[OmniTags] Sem resumo do chat. Clique em Ler Conversa primeiro.');
+      console.warn('[OmniTag] Sem resumo do chat. Clique em Ler Conversa primeiro.');
       setTimeout(function() { btnLearn.textContent = '\uD83E\uDDE0'; btnLearn.title = 'Salvar Aprendizado'; }, 3000);
       return;
     }

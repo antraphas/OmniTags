@@ -1,4 +1,4 @@
-// Background Service Worker — Abre o painel OmniTags como janela centralizada
+// Background Service Worker — Abre o painel OmniTag como janela centralizada
 chrome.action.onClicked.addListener(function () {
   var w = 820;
   var h = 640;

@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>OmniTags — Painel de Controle</title>
+  <title>OmniTag — Painel de Controle</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="popup.css">
 </head>
@@ -10,8 +10,13 @@
   <!-- ========== HEADER ========== -->
   <header class="app-header">
     <div class="header-left">
-      <span class="logo-icon">✨</span>
-      <h1>OmniTags <span class="version-badge">v2.0</span></h1>
+      <span class="logo-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+          <line x1="7" y1="7" x2="7.01" y2="7"></line>
+        </svg>
+      </span>
+      <h1>OmniTag <span class="version-badge">v2.1</span></h1>
     </div>
     <nav class="tab-bar">
       <button class="tab-btn active" data-tab="dashboard">
@@ -75,12 +80,7 @@
   <!-- ========== TAB: CONFIGURAÇÃO ========== -->
   <main class="tab-content" id="tab-config">
     <div class="config-header">
-      <div class="config-primary">
-        <label>IA Principal (Prioridade de uso)</label>
-        <select id="primary-provider" class="select-field">
-          <!-- Populated dynamically -->
-        </select>
-      </div>
+      <!-- Ordem de prioridade fixa: Gemini > Groq > OpenRouter > Customizados. Habilite os provedores desejados. -->
     </div>
 
     <div class="providers-list" id="providers-list">
@@ -151,5 +151,8 @@
   </main>
 
   <script src="popup.js"></script>
+  <footer class="app-footer-credits">
+    Desenvolvido por <a href="https://www.raphaelsuarez.com.br" target="_blank" class="neon-link">&lt;Raphael Suarez/&gt;</a> - Assistente de Experiencia Junior
+  </footer>
 </body>
 </html>

@@ -1,6 +1,13 @@
 // ==================== OMNITAGS POPUP v2.0 ====================
 // Provedores padrão (built-in) — IDs e configurações fixas
 var DEFAULT_PROVIDERS = {
+  gemini: {
+    name: 'Google Gemini',
+    url: '__gemini__',
+    keyLink: 'https://aistudio.google.com/app/apikey',
+    models: ['gemini-2.5-flash'],
+    builtIn: true
+  },
   groq: {
     name: 'Groq',
     url: 'https://api.groq.com/openai/v1/chat/completions',
@@ -22,13 +29,6 @@ var DEFAULT_PROVIDERS = {
     ],
     builtIn: true
   },
-  gemini: {
-    name: 'Google Gemini',
-    url: '__gemini__',
-    keyLink: 'https://aistudio.google.com/app/apikey',
-    models: ['gemini-2.5-flash'],
-    builtIn: true
-  }
 };
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // ==================== REFERENCES ====================
-  var providerSelect = document.getElementById('primary-provider');
+  /* var providerSelect = document.getElementById('primary-provider'); */
   var providersList = document.getElementById('providers-list');
   var saveBtn = document.getElementById('save-btn');
   var statusMsg = document.getElementById('status-message');
@@ -67,12 +67,14 @@ document.addEventListener('DOMContentLoaded', function() {
   // State
   var currentProviders = {}; // merged: default + custom
   var currentApiKeys = {};
+  var currentEnabledProviders = {};
   var currentModels = {}; // provider_id -> [model, ...]
 
   // ==================== LOAD CONFIG TAB ====================
   function loadConfig() {
-    chrome.storage.local.get(['apiKeys', 'primaryProvider', 'customProviders', 'customModels'], function(result) {
+    chrome.storage.local.get(['apiKeys', 'enabledProviders', 'customProviders', 'customModels'], function(result) {
       currentApiKeys = result.apiKeys || {};
+      currentEnabledProviders = result.enabledProviders || { gemini: true, groq: true, openrouter: true };
       var customProviders = result.customProviders || {};
       var customModels = result.customModels || {};
 
@@ -93,17 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       });
 
-      // Build provider select
-      providerSelect.innerHTML = '';
-      Object.keys(currentProviders).forEach(function(id) {
-        var opt = document.createElement('option');
-        opt.value = id;
-        opt.textContent = currentProviders[id].name;
-        providerSelect.appendChild(opt);
-      });
-      if (result.primaryProvider && currentProviders[result.primaryProvider]) {
-        providerSelect.value = result.primaryProvider;
-      }
+/* primary provider logic removed */
 
       renderProviders();
     });
@@ -121,14 +113,19 @@ document.addEventListener('DOMContentLoaded', function() {
       // Header
       var header = document.createElement('div');
       header.className = 'provider-header';
+      var isEnabled = currentEnabledProviders[id] !== false;
       header.innerHTML = '<div class="provider-name">' +
         escapeHTML(prov.name) +
         ' <span class="provider-badge ' + (prov.builtIn ? 'built-in' : 'custom-badge') + '">' +
         (prov.builtIn ? 'padrão' : 'custom') + '</span>' +
         '</div>' +
+        '<label class="toggle-switch" title="Ativar/Desativar Provedor">' +
+        '<input type="checkbox" data-toggle-provider="' + id + '" ' + (isEnabled ? 'checked' : '') + '>' +
+        '<span class="slider"></span></label>' +
         '<span class="provider-chevron">▼</span>';
 
-      header.addEventListener('click', function() {
+      header.addEventListener('click', function(e) {
+        if(e.target.tagName.toLowerCase() === 'input' || e.target.classList.contains('slider')) return;
         card.classList.toggle('open');
       });
 
@@ -146,13 +143,70 @@ document.addEventListener('DOMContentLoaded', function() {
       keyLabel += '</label>';
       keyField.innerHTML = keyLabel;
 
-      var keyInput = document.createElement('input');
-      keyInput.type = 'password';
-      keyInput.className = 'input-field';
-      keyInput.setAttribute('data-key-provider', id);
-      keyInput.placeholder = id === 'gemini' ? 'AIzaSy...' : id === 'groq' ? 'gsk_...' : 'sk-...';
-      keyInput.value = currentApiKeys[id] || '';
-      keyField.appendChild(keyInput);
+      // Dynamic keys container
+      var keysContainer = document.createElement('div');
+      keysContainer.className = 'keys-container';
+      keysContainer.setAttribute('data-provider-keys', id);
+
+      var keys = currentApiKeys[id] || [];
+      if(!Array.isArray(keys) && typeof keys === 'string') keys = [keys];
+      if(keys.length === 0) keys = ['']; // Pelo menos um campo vazio
+
+      function createKeyRow(keyValue, isPrimary) {
+        var row = document.createElement('div');
+        row.className = 'key-row';
+
+        var input = document.createElement('input');
+        input.type = 'password';
+        input.className = 'key-input';
+        input.placeholder = id === 'gemini' ? 'AIzaSy...' : 'sk-...';
+        input.value = keyValue || '';
+
+        var radioWrapper = document.createElement('label');
+        radioWrapper.className = 'radio-wrapper';
+        radioWrapper.title = 'Marcar como Principal';
+        
+        var radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'primary_key_' + id;
+        if(isPrimary) radio.checked = true;
+        
+        radioWrapper.appendChild(radio);
+        radioWrapper.appendChild(document.createTextNode(' Principal'));
+
+        var removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-key-btn';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.title = 'Remover chave';
+        removeBtn.addEventListener('click', function() {
+           row.remove();
+           // se era o único checked, marca o primeiro que sobrar
+           if(radio.checked) {
+             var firstRadio = keysContainer.querySelector('input[type="radio"]');
+             if(firstRadio) firstRadio.checked = true;
+           }
+        });
+
+        row.appendChild(input);
+        row.appendChild(radioWrapper);
+        row.appendChild(removeBtn);
+        return row;
+      }
+
+      keys.forEach(function(k, idx) {
+         keysContainer.appendChild(createKeyRow(k, idx === 0));
+      });
+
+      var addKeyBtn = document.createElement('button');
+      addKeyBtn.className = 'add-key-btn';
+      addKeyBtn.textContent = '+ Adicionar nova key';
+      addKeyBtn.addEventListener('click', function() {
+         var isFirst = keysContainer.children.length === 0;
+         keysContainer.appendChild(createKeyRow('', isFirst));
+      });
+
+      keyField.appendChild(keysContainer);
+      keyField.appendChild(addKeyBtn);
       body.appendChild(keyField);
 
       // URL field (only for custom)
@@ -218,9 +272,7 @@ document.addEventListener('DOMContentLoaded', function() {
           delete currentProviders[id];
           delete currentApiKeys[id];
           card.remove();
-          // Update select
-          var opt = providerSelect.querySelector('option[value="' + id + '"]');
-          if (opt) opt.remove();
+// Select removed
         });
         body.appendChild(removeBtn);
       }
@@ -279,14 +331,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // ==================== SAVE CONFIG ====================
   saveBtn.addEventListener('click', function() {
-    var primary = providerSelect.value;
+    // Collect enabled states
+    var enabledStates = {};
+    document.querySelectorAll('[data-toggle-provider]').forEach(function(input) {
+      enabledStates[input.getAttribute('data-toggle-provider')] = input.checked;
+    });
 
-    // Collect API keys from all inputs
+    // Collect API keys
     var keys = {};
-    document.querySelectorAll('[data-key-provider]').forEach(function(input) {
-      var pid = input.getAttribute('data-key-provider');
-      var val = input.value.trim();
-      if (val) keys[pid] = val;
+    document.querySelectorAll('[data-provider-keys]').forEach(function(container) {
+      var pid = container.getAttribute('data-provider-keys');
+      var collected = [];
+      var rows = container.querySelectorAll('.key-row');
+      
+      var primaryKey = null;
+      var fallbackKeys = [];
+      
+      rows.forEach(function(row) {
+         var inputVal = row.querySelector('.key-input').value.trim();
+         var isPrimary = row.querySelector('input[type="radio"]').checked;
+         
+         if(inputVal) {
+            if(isPrimary) primaryKey = inputVal;
+            else fallbackKeys.push(inputVal);
+         }
+      });
+      
+      if(primaryKey) collected.push(primaryKey);
+      fallbackKeys.forEach(function(fk) { collected.push(fk); });
+      
+      if(collected.length > 0) {
+         keys[pid] = collected;
+      }
     });
 
     // Collect URLs for custom providers
@@ -322,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     chrome.storage.local.set({
       apiKeys: keys,
-      primaryProvider: primary,
+      enabledProviders: enabledStates,
       customProviders: customProviders,
       customModels: customModels
     }, function() {

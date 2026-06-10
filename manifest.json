@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "OmniTags",
+  "name": "OmniTag",
   "version": "2.0",
   "description": "Sugere tags para o FreshDesk com base no conteúdo do chat usando IA.",
   "permissions": ["storage", "activeTab"],
@@ -21,6 +21,6 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "OmniTags — Clique para abrir o painel"
+    "default_title": "OmniTag — Clique para abrir o painel"
   }
 }
