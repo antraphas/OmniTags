@@ -16,7 +16,7 @@
           <line x1="7" y1="7" x2="7.01" y2="7"></line>
         </svg>
       </span>
-      <h1>OmniTag <span class="version-badge">v2.1</span></h1>
+      <h1>OmniTag <span class="version-badge">v2.3 Rev 0.2</span></h1>
     </div>
     <nav class="tab-bar">
       <button class="tab-btn active" data-tab="dashboard">
@@ -34,8 +34,8 @@
   <!-- ========== TAB: DASHBOARD ========== -->
   <main class="tab-content active" id="tab-dashboard">
     <div class="metrics-grid">
-      <div class="metric-card">
-        <div class="metric-label">Chats Analisados</div>
+      <div class="metric-card metric-card-clickable" id="card-chats-analisados" title="Ver histórico de chats analisados">
+        <div class="metric-label">Chats Analisados <span class="metric-label-icon">↗</span></div>
         <div class="metric-value" id="m-total-chats">0</div>
         <div class="metric-sub">total de análises via IA</div>
       </div>
@@ -86,6 +86,8 @@
     <div class="providers-list" id="providers-list">
       <!-- Populated dynamically by JS -->
     </div>
+
+
 
     <button class="btn btn-accent btn-full" id="add-provider-btn">
       <span>＋</span> Adicionar Novo Provedor
@@ -142,13 +144,54 @@
         <div class="backup-icon">📋</div>
         <h3>Informações da Extensão</h3>
         <p class="backup-desc">
-          <strong>Versão:</strong> 2.0<br>
+          <strong>Versão:</strong> 2.3 Rev 0.2<br>
           <strong>Armazenamento:</strong> chrome.storage.local (persistente)<br>
           <strong>Formato de Backup:</strong> JSON (chaves + provedores + aprendizado + métricas)
         </p>
       </div>
+
+      <!-- Lista de correções salvas -->
+      <div class="corrections-section mt-16">
+        <div class="corrections-header">
+          <h3>🔖 Correções Salvas</h3>
+          <span class="corrections-badge" id="corrections-count">0</span>
+        </div>
+        <p class="corrections-desc">Clique em uma correção para ver os detalhes ou excluí-la.</p>
+        <div class="corrections-list" id="corrections-list">
+          <div class="corrections-empty">Nenhuma correção salva ainda.</div>
+        </div>
+      </div>
     </div>
   </main>
+
+  <!-- ========== MODAL: DETALHE DE CORREÇÃO ========== -->
+  <div class="modal-overlay" id="correction-detail-modal" style="display:none;">
+    <div class="modal-card modal-card-correction">
+      <div class="modal-history-header">
+        <h3>🔖 Detalhe da Correção</h3>
+        <button class="btn-close-history" id="close-correction-modal">✕</button>
+      </div>
+      <div class="correction-detail-body" id="correction-detail-body">
+        <!-- populated by JS -->
+      </div>
+      <div class="correction-detail-footer">
+        <button class="btn btn-danger btn-sm" id="delete-correction-btn">🗑️ Excluir esta correção</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== MODAL: HISTÓRICO DE CHATS ========== -->
+  <div class="modal-overlay" id="chat-history-modal" style="display:none;">
+    <div class="modal-card modal-card-history">
+      <div class="modal-history-header">
+        <h3>📋 Histórico de Chats Analisados</h3>
+        <button class="btn-close-history" id="close-history-modal">✕</button>
+      </div>
+      <div class="modal-history-body" id="chat-history-list">
+        <div class="chat-history-empty">Nenhum chat analisado ainda.</div>
+      </div>
+    </div>
+  </div>
 
   <script src="popup.js"></script>
   <footer class="app-footer-credits">

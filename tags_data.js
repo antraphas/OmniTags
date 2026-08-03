@@ -212,7 +212,7 @@ const tagsData = [
     "description": "Bugs referentes ao assunto acima."
   },
   {
-    "name": "suporte-sob-demanda",
+    "name": "suporte-sobdemanda",
     "description": "Deve ser usada em todos os casos de chat relacionados à integração Sob Demanda ou a assuntos correlacionados a este tema."
   },
   {

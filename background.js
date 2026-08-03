@@ -1,7 +1,7 @@
 // Background Service Worker — Abre o painel OmniTag como janela centralizada
 chrome.action.onClicked.addListener(function () {
-  var w = 820;
-  var h = 640;
+  var w = 900;
+  var h = 720;
 
   chrome.windows.getCurrent(function (currentWin) {
     var left = Math.round((currentWin.left || 0) + ((currentWin.width || 1280) - w) / 2);

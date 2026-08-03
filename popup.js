@@ -29,6 +29,13 @@ var DEFAULT_PROVIDERS = {
     ],
     builtIn: true
   },
+  toqan: {
+    name: 'Toqan (iFood AI Platform)',
+    url: 'https://api.coco.prod.toqan.ai/api',
+    keyLink: '',
+    models: ['toqan-agent'],
+    builtIn: true
+  },
 };
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -70,11 +77,16 @@ document.addEventListener('DOMContentLoaded', function() {
   var currentEnabledProviders = {};
   var currentModels = {}; // provider_id -> [model, ...]
 
-  // ==================== LOAD CONFIG TAB ====================
   function loadConfig() {
-    chrome.storage.local.get(['apiKeys', 'enabledProviders', 'customProviders', 'customModels'], function(result) {
+    chrome.storage.local.get(['apiKeys', 'enabledProviders', 'customProviders', 'customModels', 'toqan_base_url'], function(result) {
       currentApiKeys = result.apiKeys || {};
-      currentEnabledProviders = result.enabledProviders || { gemini: true, groq: true, openrouter: true };
+      currentEnabledProviders = result.enabledProviders || { gemini: true, groq: true, openrouter: true, toqan: true };
+      
+      // Se enabledProviders foi salvo mas toqan não está nele, inicializa como true por padrão
+      if (result.enabledProviders && result.enabledProviders.toqan === undefined) {
+        currentEnabledProviders.toqan = true;
+      }
+
       var customProviders = result.customProviders || {};
       var customModels = result.customModels || {};
 
@@ -82,6 +94,9 @@ document.addEventListener('DOMContentLoaded', function() {
       currentProviders = {};
       Object.keys(DEFAULT_PROVIDERS).forEach(function(id) {
         currentProviders[id] = JSON.parse(JSON.stringify(DEFAULT_PROVIDERS[id]));
+        if (id === 'toqan' && result.toqan_base_url) {
+          currentProviders[id].url = result.toqan_base_url;
+        }
         // Apply custom models if user modified them
         if (customModels[id]) {
           currentProviders[id].models = customModels[id];
@@ -159,7 +174,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var input = document.createElement('input');
         input.type = 'password';
         input.className = 'key-input';
-        input.placeholder = id === 'gemini' ? 'AIzaSy...' : 'sk-...';
+        input.placeholder = id === 'gemini' ? 'AIzaSy...' : (id === 'toqan' ? 'Chave de API do Toqan...' : 'sk-...');
         input.value = keyValue || '';
 
         var radioWrapper = document.createElement('label');
@@ -209,11 +224,11 @@ document.addEventListener('DOMContentLoaded', function() {
       keyField.appendChild(addKeyBtn);
       body.appendChild(keyField);
 
-      // URL field (only for custom)
-      if (!prov.builtIn) {
+      // URL field (only for custom or toqan)
+      if (!prov.builtIn || id === 'toqan') {
         var urlField = document.createElement('div');
         urlField.className = 'provider-field';
-        urlField.innerHTML = '<label>URL da API</label>';
+        urlField.innerHTML = '<label>URL da API (Base URL)</label>';
         var urlInput = document.createElement('input');
         urlInput.type = 'text';
         urlInput.className = 'input-field';
@@ -365,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
 
-    // Collect URLs for custom providers
+    // Collect URLs for custom providers or toqan
     document.querySelectorAll('[data-url-provider]').forEach(function(input) {
       var pid = input.getAttribute('data-url-provider');
       if (currentProviders[pid]) {
@@ -390,17 +405,28 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
 
+    // Validar se API Key do Toqan foi informada caso esteja ativo
+    if (enabledStates['toqan'] && (!keys['toqan'] || keys['toqan'].length === 0)) {
+      statusMsg.style.color = '#ef4444';
+      statusMsg.textContent = '⚠️ Por favor, insira a API Key do Toqan.';
+      return;
+    }
+
     if (Object.keys(keys).length === 0) {
       statusMsg.style.color = '#ef4444';
       statusMsg.textContent = 'Insira pelo menos uma chave de API.';
       return;
     }
 
+    var toqanUrlInput = document.querySelector('[data-url-provider="toqan"]');
+    var toqanBaseUrl = toqanUrlInput ? toqanUrlInput.value.trim() : 'https://api.coco.prod.toqan.ai/api';
+
     chrome.storage.local.set({
       apiKeys: keys,
       enabledProviders: enabledStates,
       customProviders: customProviders,
-      customModels: customModels
+      customModels: customModels,
+      toqan_base_url: toqanBaseUrl
     }, function() {
       statusMsg.style.color = '#10b981';
       statusMsg.textContent = 'Configurações salvas com sucesso!';
@@ -478,12 +504,13 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('m-hits').textContent = hits;
       document.getElementById('m-misses').textContent = misses;
 
-      // Accuracy
+      // Accuracy — now per-tag: hits = tags kept, misses = tags removed by user
       var total = hits + misses;
       if (total > 0) {
         var pct = Math.round((hits / total) * 100);
         document.getElementById('m-accuracy').textContent = pct + '%';
-        document.getElementById('m-accuracy-sub').textContent = hits + ' acertos em ' + total + ' aprendizados';
+        document.getElementById('m-accuracy-sub').textContent =
+          hits + ' tags corretas de ' + total + ' sugeridas';
       } else {
         document.getElementById('m-accuracy').textContent = '—';
         document.getElementById('m-accuracy-sub').textContent = 'clique no 🧠 após corrigir tags para gerar dados';
@@ -496,10 +523,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // Chart
       renderChart(metrics.tokensByProvider || {});
+
+      // Chat history list
+      renderChatHistory(metrics.chatHistory || []);
     });
   }
 
   function renderChart(tokensByProvider) {
+
     var chartEl = document.getElementById('provider-chart');
     var entries = Object.keys(tokensByProvider).map(function(key) {
       return { name: key, tokens: tokensByProvider[key] || 0 };
@@ -526,6 +557,50 @@ document.addEventListener('DOMContentLoaded', function() {
     chartEl.innerHTML = html;
   }
 
+  // ==================== CHAT HISTORY MODAL ====================
+  function renderChatHistory(history) {
+    var listEl = document.getElementById('chat-history-list');
+    if (!listEl) return;
+
+    if (!history || history.length === 0) {
+      listEl.innerHTML = '<div class="chat-history-empty">Nenhum chat analisado ainda.<br><small>Clique em "Ler Conversa" em um chat do Freshdesk para registrar.</small></div>';
+      return;
+    }
+
+    var html = '';
+    history.forEach(function(entry, idx) {
+      var idBadge = entry.chatId
+        ? ' <span class="chat-history-id">#' + escapeHTML(entry.chatId) + '</span>'
+        : '';
+      html += '<a class="chat-history-item" href="' + escapeHTML(entry.url) + '" target="_blank" title="' + escapeHTML(entry.url) + '">' +
+        '<span class="chat-history-icon">💬</span>' +
+        '<span class="chat-history-label">Chat ' + escapeHTML(entry.date) + idBadge + '</span>' +
+        '<span class="chat-history-arrow">↗</span>' +
+        '</a>';
+    });
+    listEl.innerHTML = html;
+  }
+
+  var cardChats = document.getElementById('card-chats-analisados');
+  var historyModal = document.getElementById('chat-history-modal');
+  var closeHistoryBtn = document.getElementById('close-history-modal');
+
+  if (cardChats && historyModal) {
+    cardChats.addEventListener('click', function() {
+      historyModal.style.display = 'flex';
+    });
+  }
+  if (closeHistoryBtn && historyModal) {
+    closeHistoryBtn.addEventListener('click', function() {
+      historyModal.style.display = 'none';
+    });
+  }
+  if (historyModal) {
+    historyModal.addEventListener('click', function(e) {
+      if (e.target === historyModal) historyModal.style.display = 'none';
+    });
+  }
+
   // ==================== RESET METRICS ====================
   resetMetricsBtn.addEventListener('click', function() {
     if (confirm('Tem certeza que deseja resetar todas as métricas? O aprendizado NÃO será apagado.')) {
@@ -536,15 +611,201 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // ==================== BACKUP TAB ====================
+  var currentCorrectionIndex = null; // tracks which correction is open in the modal
+
   function loadBackup() {
     chrome.storage.local.get(['learningData'], function(result) {
       var data = result.learningData || [];
       learningCount.textContent = data.length + ' correções salvas';
+      renderCorrectionsList(data);
+    });
+  }
+
+  function renderCorrectionsList(data) {
+    var listEl = document.getElementById('corrections-list');
+    var countEl = document.getElementById('corrections-count');
+    if (!listEl) return;
+
+    if (countEl) countEl.textContent = data.length;
+
+    if (data.length === 0) {
+      listEl.innerHTML = '<div class="corrections-empty">Nenhuma correção salva ainda.<br><small>Clique em 🧠 após corrigir tags para registrar.</small></div>';
+      return;
+    }
+
+    // Show most recent first
+    var reversed = data.slice().reverse();
+    var html = '';
+    reversed.forEach(function(entry, idx) {
+      var realIdx = data.length - 1 - idx;
+      var date = entry.timestamp
+        ? new Date(entry.timestamp).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+        : '—';
+
+      // Use saved counts (new entries) or compute on-the-fly (legacy entries)
+      var hitCount  = (entry.hitCount  !== undefined) ? entry.hitCount
+        : (entry.suggestedTags || []).filter(function(t) { return (entry.actualTags || []).indexOf(t) !== -1; }).length;
+      var missCount = (entry.missCount !== undefined) ? entry.missCount
+        : (entry.suggestedTags || []).filter(function(t) { return (entry.actualTags || []).indexOf(t) === -1; }).length;
+
+      var statusHtml = '';
+      if (hitCount > 0)  statusHtml += '<span class="correction-status status-hit">✓ ' + hitCount  + ' acerto'  + (hitCount  > 1 ? 's' : '') + '</span>';
+      if (missCount > 0) statusHtml += '<span class="correction-status status-miss">✗ ' + missCount + ' erro'   + (missCount > 1 ? 's' : '') + '</span>';
+      if (!statusHtml)   statusHtml = '<span class="correction-status status-hit">✓ Perfeito</span>';
+
+      var preview = (entry.chatSummary || '').replace(/\n/g, ' ').substring(0, 80);
+
+      html += '<div class="correction-item" data-idx="' + realIdx + '">' +
+        '<div class="correction-item-top">' +
+          '<span class="correction-date">' + escapeHTML(date) + '</span>' +
+          '<span class="correction-statuses">' + statusHtml + '</span>' +
+          '<button class="correction-delete-inline" data-idx="' + realIdx + '" title="Excluir">🗑️</button>' +
+        '</div>' +
+        '<div class="correction-preview-text">' + escapeHTML(preview) + (preview.length >= 80 ? '…' : '') + '</div>' +
+        '<div class="correction-tags-row">' +
+          '<span class="ctag-label">IA:</span>' +
+          renderTagPillsCompared(entry.suggestedTags || [], entry.actualTags || []) +
+          '<span class="ctag-sep">→</span>' +
+          '<span class="ctag-label">Correto:</span>' +
+          renderTagPills(entry.actualTags || [], 'pill-actual') +
+        '</div>' +
+      '</div>';
+    });
+    listEl.innerHTML = html;
+
+    // Click on item → open detail modal
+    listEl.querySelectorAll('.correction-item').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        if (e.target.classList.contains('correction-delete-inline') ||
+            e.target.closest('.correction-delete-inline')) return;
+        var idx = parseInt(el.getAttribute('data-idx'));
+        openCorrectionDetail(data, idx);
+      });
+    });
+
+    // Inline delete buttons
+    listEl.querySelectorAll('.correction-delete-inline').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var idx = parseInt(btn.getAttribute('data-idx'));
+        if (confirm('Excluir esta correção?')) {
+          deleteCorrection(data, idx);
+        }
+      });
+    });
+  }
+
+  function renderTagPills(tags, cls) {
+    if (!tags || tags.length === 0) return '<span class="pill-empty">—</span>';
+    return tags.map(function(t) {
+      return '<span class="tag-pill ' + cls + '">' + escapeHTML(t) + '</span>';
+    }).join('');
+  }
+
+  // Renders suggested tag pills highlighted as hit (green) or miss (red)
+  function renderTagPillsCompared(suggestedTags, actualTags) {
+    if (!suggestedTags || suggestedTags.length === 0) return '<span class="pill-empty">—</span>';
+    return suggestedTags.map(function(t) {
+      var isHit = actualTags.indexOf(t) !== -1;
+      return '<span class="tag-pill ' + (isHit ? 'pill-hit' : 'pill-miss') + '">' + escapeHTML(t) + '</span>';
+    }).join('');
+  }
+
+  function openCorrectionDetail(data, idx) {
+    var entry = data[idx];
+    if (!entry) return;
+    currentCorrectionIndex = idx;
+
+    var date = entry.timestamp
+      ? new Date(entry.timestamp).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+      : '—';
+
+    var chatPreview = (entry.chatSummary || '(sem preview de chat)').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    var hitCount  = (entry.hitCount  !== undefined) ? entry.hitCount
+      : (entry.suggestedTags || []).filter(function(t) { return (entry.actualTags || []).indexOf(t) !== -1; }).length;
+    var missCount = (entry.missCount !== undefined) ? entry.missCount
+      : (entry.suggestedTags || []).filter(function(t) { return (entry.actualTags || []).indexOf(t) === -1; }).length;
+
+    var statusHtml = '';
+    if (hitCount > 0)  statusHtml += '<span class="correction-status status-hit">✓ ' + hitCount  + ' acerto'  + (hitCount  > 1 ? 's' : '') + '</span> ';
+    if (missCount > 0) statusHtml += '<span class="correction-status status-miss">✗ ' + missCount + ' erro'   + (missCount > 1 ? 's' : '') + '</span>';
+    if (!statusHtml)   statusHtml = '<span class="correction-status status-hit">✓ IA acertou tudo</span>';
+
+    var bodyEl = document.getElementById('correction-detail-body');
+    var chatLinkHtml = entry.chatUrl
+      ? '<div class="cd-chat-link"><a href="' + escapeHTML(entry.chatUrl) + '" target="_blank" class="cd-link-anchor">' +
+          '🔗 Abrir Chat Original</a></div>'
+      : '';
+
+    bodyEl.innerHTML =
+      '<div class="cd-date">📅 ' + escapeHTML(date) + ' &nbsp;' + statusHtml + '</div>' +
+      chatLinkHtml +
+
+      '<div class="cd-section">' +
+        '<div class="cd-section-title">💬 Prévia do Chat</div>' +
+        '<div class="cd-chat-preview">' + chatPreview + '</div>' +
+      '</div>' +
+
+      '<div class="cd-section">' +
+        '<div class="cd-section-title">🤖 Tags sugeridas pela IA <small style="font-weight:400;text-transform:none;opacity:0.7">(verde = acertou · vermelho = errou)</small></div>' +
+        '<div class="cd-tags">' + renderTagPillsCompared(entry.suggestedTags || [], entry.actualTags || []) + '</div>' +
+      '</div>' +
+
+      '<div class="cd-section">' +
+        '<div class="cd-section-title">✅ Tags corretas (você escolheu)</div>' +
+        '<div class="cd-tags">' + renderTagPills(entry.actualTags || [], 'pill-actual') + '</div>' +
+      '</div>';
+
+    document.getElementById('correction-detail-modal').style.display = 'flex';
+  }
+
+  function deleteCorrection(data, idx) {
+    data.splice(idx, 1);
+    chrome.storage.local.set({ learningData: data }, function() {
+      learningCount.textContent = data.length + ' correções salvas';
+      renderCorrectionsList(data);
+      // Close modal if open
+      var modal = document.getElementById('correction-detail-modal');
+      if (modal) modal.style.display = 'none';
+      var statusEl = document.getElementById('learning-status');
+      if (statusEl) {
+        statusEl.style.color = '#10b981';
+        statusEl.textContent = 'Correção excluída.';
+        setTimeout(function() { statusEl.textContent = ''; }, 2500);
+      }
+    });
+  }
+
+  // Modal close / delete button wiring
+  var correctionModal   = document.getElementById('correction-detail-modal');
+  var closeCorrectionBtn = document.getElementById('close-correction-modal');
+  var deleteCorrectionBtn = document.getElementById('delete-correction-btn');
+
+  if (closeCorrectionBtn) {
+    closeCorrectionBtn.addEventListener('click', function() {
+      correctionModal.style.display = 'none';
+    });
+  }
+  if (correctionModal) {
+    correctionModal.addEventListener('click', function(e) {
+      if (e.target === correctionModal) correctionModal.style.display = 'none';
+    });
+  }
+  if (deleteCorrectionBtn) {
+    deleteCorrectionBtn.addEventListener('click', function() {
+      if (currentCorrectionIndex === null) return;
+      if (!confirm('Excluir esta correção permanentemente?')) return;
+      chrome.storage.local.get(['learningData'], function(result) {
+        var data = result.learningData || [];
+        deleteCorrection(data, currentCorrectionIndex);
+        currentCorrectionIndex = null;
+      });
     });
   }
 
   exportBtn.addEventListener('click', function() {
-    chrome.storage.local.get(['learningData', 'apiKeys', 'primaryProvider', 'customProviders', 'customModels', 'omnitagsMetrics'], function(result) {
+    chrome.storage.local.get(['learningData', 'apiKeys', 'primaryProvider', 'customProviders', 'customModels', 'omnitagsMetrics', 'toqan_api_key', 'toqan_enabled', 'toqan_base_url'], function(result) {
       var data = {
         learningData: result.learningData || [],
         apiKeys: result.apiKeys || {},
@@ -552,8 +813,11 @@ document.addEventListener('DOMContentLoaded', function() {
         customProviders: result.customProviders || {},
         customModels: result.customModels || {},
         omnitagsMetrics: result.omnitagsMetrics || {},
+        toqan_api_key: result.toqan_api_key || '',
+        toqan_enabled: result.toqan_enabled || false,
+        toqan_base_url: result.toqan_base_url || 'https://api.coco.prod.toqan.ai/api',
         exportedAt: new Date().toISOString(),
-        version: '2.0'
+        version: '2.3 Rev 0.2'
       };
 
       var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -587,6 +851,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var newCustomProviders = null;
         var newCustomModels = null;
         var newMetrics = null;
+        var newToqanApiKey = null;
+        var newToqanEnabled = null;
+        var newToqanBaseUrl = null;
 
         if (Array.isArray(imported)) {
           newLearning = imported;
@@ -597,6 +864,9 @@ document.addEventListener('DOMContentLoaded', function() {
           newCustomProviders = imported.customProviders;
           newCustomModels = imported.customModels;
           newMetrics = imported.omnitagsMetrics;
+          newToqanApiKey = imported.toqan_api_key;
+          newToqanEnabled = imported.toqan_enabled;
+          newToqanBaseUrl = imported.toqan_base_url;
         }
 
         chrome.storage.local.get(['learningData'], function(result) {
@@ -616,6 +886,9 @@ document.addEventListener('DOMContentLoaded', function() {
           if (newCustomProviders) updates.customProviders = newCustomProviders;
           if (newCustomModels) updates.customModels = newCustomModels;
           if (newMetrics) updates.omnitagsMetrics = newMetrics;
+          if (newToqanApiKey !== null && newToqanApiKey !== undefined) updates.toqan_api_key = newToqanApiKey;
+          if (newToqanEnabled !== null && newToqanEnabled !== undefined) updates.toqan_enabled = newToqanEnabled;
+          if (newToqanBaseUrl !== null && newToqanBaseUrl !== undefined) updates.toqan_base_url = newToqanBaseUrl;
 
           chrome.storage.local.set(updates, function() {
             learningCount.textContent = existing.length + ' correções salvas';

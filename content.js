@@ -135,20 +135,69 @@ function scoreTagsFallback(chatText, learningData) {
 
 function extractChatText() {
   var chatText = "";
-  var messageElements = document.querySelectorAll('.message-text, .msg-content, [data-test-id="message-text"], .conversation-message');
 
+  // === PRIORIDADE 1: Seletores específicos de mensagem (Freshdesk Tickets clássico) ===
+  var messageElements = document.querySelectorAll(
+    '.message-text, .msg-content, [data-test-id="message-text"], .conversation-message'
+  );
   if (messageElements.length > 0) {
-    chatText = Array.from(messageElements).map(function(el) { return el.innerText; }).join(" \n ");
-  } else {
-    var mainColumn = document.querySelector('.conversation-container, .main-content, .layout-main, .center-column');
-    if (mainColumn) {
-      chatText = mainColumn.innerText;
-    } else {
-      chatText = document.body.innerText;
+    chatText = Array.from(messageElements).map(function(el) { return el.innerText; }).join("\n");
+    if (chatText.trim().length > 20) return chatText;
+  }
+
+  // === PRIORIDADE 2: Freshdesk Messaging / FreshChat (confirmado por diagnóstico) ===
+  // [class*="message-bubble"] e [class*="chat-message"] encontraram 20 mensagens cada
+  var freshchatSelectors = [
+    '[class*="message-bubble"]',
+    '[class*="chat-message"]',
+    '[class*="conv__bubble"]',
+    '[class*="cw-message"]',
+    '[class*="message__content"]',
+    '[class*="msg__text"]'
+  ];
+
+  for (var s = 0; s < freshchatSelectors.length; s++) {
+    var els = document.querySelectorAll(freshchatSelectors[s]);
+    if (els.length > 0) {
+      var candidate = Array.from(els).map(function(el) {
+        return el.innerText.trim();
+      }).filter(function(t) { return t.length > 0; }).join("\n");
+      if (candidate.trim().length > 20) {
+        console.log('[OmniTag] Chat extraído via:', freshchatSelectors[s], '(' + els.length + ' elementos)');
+        return candidate;
+      }
     }
   }
-  return chatText;
+
+  // === PRIORIDADE 3: Container principal (mais seguro que body inteiro) ===
+  var containerSelectors = [
+    '.conversation-container',
+    '.main-content',
+    '.layout-main',
+    '.center-column',
+    '[data-test-id="conversation-content"]',
+    '[data-test-id="conversation-view"]',
+    '.conv-main-area',
+    '.conversation-wrap',
+    '.message-list'
+  ];
+
+  for (var c = 0; c < containerSelectors.length; c++) {
+    var container = document.querySelector(containerSelectors[c]);
+    if (container) {
+      var containerText = container.innerText.trim();
+      if (containerText.length > 20) {
+        console.log('[OmniTag] Chat extraído via container:', containerSelectors[c]);
+        return containerText;
+      }
+    }
+  }
+
+  // === FALLBACK: body inteiro (último recurso — pode capturar UI da página) ===
+  console.warn('[OmniTag] Usando fallback body.innerText — nenhum seletor específico funcionou.');
+  return document.body.innerText;
 }
+
 
 function censorText(text) {
   text = text.replace(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, "[EMAIL OCULTO]");
@@ -160,120 +209,189 @@ function censorText(text) {
 }
 
 // ==================== SISTEMA DE APRENDIZADO ====================
+// Helper: reads text from a fw-tag element in a Chrome extension isolated world.
+// JS custom-element properties (t.text, t.value) are NOT accessible from isolated worlds
+// because they are defined in the page's main world. We use getAttribute and shadowRoot instead.
+function getFwTagText(t) {
+  // 1. getAttribute works across worlds and often mirrors the JS property
+  var attr = (t.getAttribute('text') || t.getAttribute('value') || '').trim();
+  if (attr && !attr.match(/^[0-9a-f]{8}-/i)) return attr; // skip UUID values
+
+  // 2. Read from fw-tag's own shadowRoot (confirmed working by diagnostic)
+  if (t.shadowRoot) {
+    var span = t.shadowRoot.querySelector(
+      '[part="tag-text"], .tag-text, .tag-label, [class*="tag"] span, span:not([class*="icon"]):not([class*="close"]):not([class*="delete"])'
+    );
+    if (span) {
+      var txt = span.textContent.trim();
+      if (txt) return txt;
+    }
+    // Try any span that is not just a symbol
+    var spans = t.shadowRoot.querySelectorAll('span');
+    for (var s = 0; s < spans.length; s++) {
+      var spanTxt = spans[s].textContent.trim();
+      if (spanTxt && spanTxt.length > 1 && !spanTxt.match(/^[×✕x×]$/i)) return spanTxt;
+    }
+  }
+
+  // 3. Try JS property access (works in page console, may work in some browsers/versions)
+  try {
+    if (t.text && typeof t.text === 'string' && t.text.trim()) return t.text.trim();
+    if (t.label && typeof t.label === 'string' && t.label.trim()) return t.label.trim();
+  } catch(e) {}
+
+  // 4. textContent / innerText fallback
+  return (t.textContent || t.innerText || '').trim().replace(/[×✕x×]$/gi, '').trim();
+}
 
 function readCurrentTagsFromField() {
+  var extracted = [];
+
+  // === STRATEGY 1: Find the Tags fw-select, then read fw-tags inside its shadow ===
   var formControls = deepQueryAll(document, 'fw-form-control, fw-select');
   var tagsFieldSelect = null;
 
   for (var i = 0; i < formControls.length; i++) {
     var el = formControls[i];
     var isTags = false;
-    var name = el.getAttribute('name');
-    if (name && name.toLowerCase().includes('tag')) isTags = true;
-    var testId = el.getAttribute('data-test-id');
-    if (testId && testId.toLowerCase().includes('tag')) isTags = true;
-    if (el.shadowRoot) {
+    var name = el.getAttribute('name') || '';
+    if (name.toLowerCase().includes('tag')) isTags = true;
+    var testId = el.getAttribute('data-test-id') || '';
+    if (testId.toLowerCase().includes('tag')) isTags = true;
+    // Check label inside shadow root (works: fw-select[0].label = 'Tags')
+    if (!isTags && el.shadowRoot) {
       var label = el.shadowRoot.querySelector('label');
-      if (label && label.textContent.toLowerCase().includes('tag')) isTags = true;
+      if (label && label.textContent.trim().toLowerCase() === 'tags') isTags = true;
     }
-    
+    // Also accept label that merely contains "tag"
+    if (!isTags && el.shadowRoot) {
+      var label2 = el.shadowRoot.querySelector('label');
+      if (label2 && label2.textContent.toLowerCase().includes('tag')) isTags = true;
+    }
+
     if (isTags) {
       if (el.tagName.toLowerCase() === 'fw-form-control' && el.shadowRoot) {
-         var innerSelect = el.shadowRoot.querySelector('fw-select');
-         tagsFieldSelect = innerSelect ? innerSelect : el;
+        var innerSelect = el.shadowRoot.querySelector('fw-select');
+        tagsFieldSelect = innerSelect || el;
       } else {
-         tagsFieldSelect = el;
+        tagsFieldSelect = el;
       }
-      break; 
+      break;
     }
   }
 
-  var extracted = [];
-
-  if (tagsFieldSelect) {
-    var val = tagsFieldSelect.value;
-    if (val && Array.isArray(val) && val.length > 0) {
-      extracted = val.map(function(v) { return typeof v === 'object' ? (v.value || v.text || v.name) : v; });
-      if (extracted.length > 0) return extracted;
+  if (tagsFieldSelect && tagsFieldSelect.shadowRoot) {
+    // Read fw-tags using the robust helper (isolated-world safe)
+    var innerTags = deepQueryAll(tagsFieldSelect.shadowRoot, 'fw-tag');
+    innerTags.forEach(function(t) {
+      var text = getFwTagText(t);
+      if (text && extracted.indexOf(text) === -1) extracted.push(text);
+    });
+    if (extracted.length > 0) {
+      console.log('[OmniTag] Tags lidas via fw-select shadow:', extracted);
+      return extracted;
     }
 
-    if (tagsFieldSelect.shadowRoot) {
-       var innerTags = deepQueryAll(tagsFieldSelect.shadowRoot, 'fw-tag');
-       innerTags.forEach(function(t) {
-         var text = (t.text || t.value || t.textContent || t.innerText || '').trim().replace(/×|✕|x$/gi, '').trim();
-         if (text && extracted.indexOf(text) === -1) {
-            extracted.push(text);
-         }
-       });
-       if (extracted.length > 0) return extracted;
-    }
-
-    var visibleText = tagsFieldSelect.innerText || '';
-    if (!visibleText && tagsFieldSelect.shadowRoot) {
-       visibleText = tagsFieldSelect.shadowRoot.host.innerText || '';
-    }
-    if (visibleText && typeof tagsData !== 'undefined') {
-       var sortedTags = tagsData.slice().sort(function(a, b) { return b.name.length - a.name.length; });
-       sortedTags.forEach(function(tagObj) {
-          var tagName = tagObj.name;
-          if (visibleText.indexOf(tagName) !== -1) {
-             visibleText = visibleText.replace(tagName, '');
-             if (extracted.indexOf(tagName) === -1) extracted.push(tagName);
-          }
-       });
-    }
-    if (extracted.length > 0) return extracted;
+    // fw-select.value fallback — may contain objects with text/name fields
+    try {
+      var val = tagsFieldSelect.value;
+      if (val && Array.isArray(val) && val.length > 0) {
+        var valMapped = val.map(function(v) {
+          if (typeof v === 'object' && v !== null) return (v.text || v.name || v.label || v.value || '');
+          if (typeof v === 'string' && !v.match(/^[0-9a-f]{8}-/i)) return v; // skip UUID strings
+          return '';
+        }).filter(function(v) { return v.trim().length > 0; });
+        if (valMapped.length > 0) {
+          console.log('[OmniTag] Tags lidas via fw-select.value:', valMapped);
+          return valMapped;
+        }
+      }
+    } catch(e) {}
   }
 
+  // === STRATEGY 2: Global search for all fw-tag in DOM (including shadow) ===
   var allFwTags = deepQueryAll(document, 'fw-tag');
   if (allFwTags.length > 0) {
-    var fallbackTags = [];
     allFwTags.forEach(function(t) {
-      var text = (t.text || t.value || t.textContent || t.innerText || '').trim().replace(/×|✕|x$/gi, '').trim();
-      if (text.length > 0) fallbackTags.push(text);
+      var text = getFwTagText(t);
+      if (text && text.length > 0 && extracted.indexOf(text) === -1) extracted.push(text);
     });
-    if (fallbackTags.length > 0) return fallbackTags;
+    if (extracted.length > 0) {
+      console.log('[OmniTag] Tags lidas via fw-tag global fallback:', extracted);
+      return extracted;
+    }
   }
 
+  // === STRATEGY 3: Legacy Freshdesk / Ember selectors ===
   var oldTagElements = deepQueryAll(document, '.tag-item, [data-test-id="ticket-properties-tags"] .ember-power-select-multiple-option');
   if (oldTagElements.length > 0) {
-    var oldTags = [];
     oldTagElements.forEach(function(t) {
-      var text = t.textContent.trim().replace(/×|✕|x$/gi, '').trim();
-      if (text.length > 0) oldTags.push(text);
+      var text = (t.textContent || '').trim().replace(/[×✕x×]$/gi, '').trim();
+      if (text.length > 0 && extracted.indexOf(text) === -1) extracted.push(text);
     });
-    if (oldTags.length > 0) return oldTags;
+    if (extracted.length > 0) {
+      console.log('[OmniTag] Tags lidas via legacy selectors:', extracted);
+      return extracted;
+    }
   }
 
+  // === STRATEGY 4: visibleText match against known tagsData ===
+  if (tagsFieldSelect && typeof tagsData !== 'undefined') {
+    var visibleText = (tagsFieldSelect.innerText || '');
+    if (!visibleText && tagsFieldSelect.shadowRoot) {
+      visibleText = (tagsFieldSelect.shadowRoot.host || tagsFieldSelect).innerText || '';
+    }
+    if (visibleText) {
+      var sortedTags = tagsData.slice().sort(function(a, b) { return b.name.length - a.name.length; });
+      sortedTags.forEach(function(tagObj) {
+        var tagName = tagObj.name;
+        if (visibleText.indexOf(tagName) !== -1) {
+          visibleText = visibleText.replace(tagName, '');
+          if (extracted.indexOf(tagName) === -1) extracted.push(tagName);
+        }
+      });
+      if (extracted.length > 0) {
+        console.log('[OmniTag] Tags lidas via visibleText match:', extracted);
+        return extracted;
+      }
+    }
+  }
+
+  console.warn('[OmniTag] Nenhuma tag encontrada com nenhuma estratégia.');
   return extracted;
 }
 
-function saveLearningData(chatSummary, suggestedTags, actualTags) {
-  var suggestedNames = suggestedTags.map(function(t) { return typeof t === 'string' ? t : t.name; }).sort();
-  var actualNames = actualTags.sort();
+function saveLearningData(chatSummary, suggestedTags, actualTags, chatUrl) {
+  var suggestedNames = suggestedTags.map(function(t) { return typeof t === 'string' ? t : t.name; });
+  var actualNames = actualTags.slice();
+
+  // Per-tag accuracy:
+  // A suggested tag is a HIT if the user kept it (it appears in actualTags)
+  // A suggested tag is a MISS if the user removed it (not in actualTags)
+  var hitTags  = suggestedNames.filter(function(tag) { return actualNames.indexOf(tag) !== -1; });
+  var missTags = suggestedNames.filter(function(tag) { return actualNames.indexOf(tag) === -1; });
+  var hitCount  = hitTags.length;
+  var missCount = missTags.length;
 
   var entry = {
-    chatSummary: chatSummary.substring(0, 300),
+    chatSummary:   chatSummary.substring(0, 2000),
     suggestedTags: suggestedNames,
-    actualTags: actualNames,
-    timestamp: Date.now()
+    actualTags:    actualNames,
+    hitCount:      hitCount,
+    missCount:     missCount,
+    chatUrl:       chatUrl || window.location.href,
+    timestamp:     Date.now()
   };
 
-  console.log('[OmniTag] Salvando aprendizado:', entry);
+  console.log('[OmniTag] Salvando aprendizado — acertos por tag:', hitCount, '| erros:', missCount, entry);
 
   chrome.storage.local.get(['learningData', 'omnitagsMetrics'], function(result) {
     var data = result.learningData || [];
     var metrics = result.omnitagsMetrics || {};
 
-    // Tracking Hit vs Miss (se a IA acertou todas as tags ou não)
-    var isHit = suggestedNames.length === actualNames.length &&
-      suggestedNames.every(function(val, index) { return val === actualNames[index]; });
-    
-    if (isHit) {
-      metrics.hits = (metrics.hits || 0) + 1;
-    } else {
-      metrics.misses = (metrics.misses || 0) + 1;
-    }
+    // Accumulate per-tag totals across all learning sessions
+    metrics.hits   = (metrics.hits   || 0) + hitCount;
+    metrics.misses = (metrics.misses || 0) + missCount;
 
     data.push(entry);
     if (data.length > 500) {
@@ -285,13 +403,14 @@ function saveLearningData(chatSummary, suggestedTags, actualTags) {
   });
 }
 
+
 function buildLearningPrompt(learningData) {
   if (!learningData || learningData.length === 0) return "";
 
   // Pega os últimos 15 exemplos
   var recent = learningData.slice(-15);
   var examples = recent.map(function(entry) {
-    return "- Conversa: \"" + entry.chatSummary.substring(0, 150) + "...\"\n" +
+    return "- Conversa: \"" + entry.chatSummary.substring(0, 600) + "...\"\n" +
       "  IA sugeriu: [" + entry.suggestedTags.join(", ") + "]\n" +
       "  Tags corretas: [" + entry.actualTags.join(", ") + "]";
   }).join("\n\n");
@@ -319,6 +438,9 @@ var PROVIDER_MODELS = {
   ],
   gemini: [
     'gemini-2.5-flash'
+  ],
+  toqan: [
+    'toqan-agent'
   ]
 };
 
@@ -346,10 +468,30 @@ function getFullPrompt(chatText, learningData) {
     "3. Mensagens de sistema como 'A conversa foi atribuída a...', 'SLA policy applied', 'IntelliAssign', etc. são apenas notificações internas e NÃO são mensagens do atendente.\n" +
     "4. A fase do ATENDENTE HUMANO começa quando uma pessoa real envia a primeira mensagem direta ao cliente após as mensagens de sistema. Cada atendente tem seu próprio nome e estilo de saudação.\n" +
     "5. Você deve IGNORAR completamente as mensagens da fase do bot. Analise APENAS o que foi conversado a partir da primeira mensagem do atendente humano em diante.\n\n" +
-    "REGRAS SOBRE TAGS ESPECIAIS:\n" +
-    "- 'sem-especificação': Use SOMENTE quando o cliente NÃO interagiu após o bot, ou seja, o atendente mandou mensagem mas o cliente NUNCA respondeu nada ao atendente.\n" +
-    "- 'sem-resposta': Use SOMENTE quando o cliente informou o assunto ao atendente, mas depois parou de responder e o atendente não conseguiu agir ou consultar nada.\n" +
-    "- NUNCA sugira 'sem-especificação' e 'sem-resposta' juntas. São mutuamente exclusivas.\n" +
+    "REGRAS SOBRE TAGS ESPECIAIS — LEIA COM ATENÇÃO:\n" +
+    "\n" +
+    "PERGUNTA-CHAVE (responda antes de escolher a tag):\n" +
+    "  → O cliente enviou ALGUMA mensagem de texto ao atendente humano após ele se apresentar?\n" +
+    "\n" +
+    "  SE NÃO → use 'sem-especificação'\n" +
+    "    Exemplos de sem-especificação:\n" +
+    "      • Atendente: 'Olá, como posso ajudar?' → cliente nunca respondeu\n" +
+    "      • Atendente: 'Com quem falo?' → silêncio total do cliente\n" +
+    "      • Atendente enviou mensagem, sistema enviou aviso de inatividade, cliente ainda sem resposta\n" +
+    "\n" +
+    "  SE SIM, mas o cliente parou antes de resolver → use 'sem-resposta'\n" +
+    "    Exemplos de sem-resposta:\n" +
+    "      • Cliente disse 'minha impressora não liga' → atendente pediu mais info → cliente sumiu\n" +
+    "      • Cliente relatou problema → atendente foi verificar → cliente não respondeu mais\n" +
+    "\n" +
+    "ATENÇÃO — NÃO contam como resposta do cliente:\n" +
+    "  • Mensagens automáticas do sistema: 'Chat será encerrado', 'Ainda deseja continuar?', 'Já tem um tempinho que não recebo mensagem'\n" +
+    "  • Notificações internas: 'SLA policy applied', 'IntelliAssign', 'A conversa foi atribuída a...'\n" +
+    "  • Mensagens do próprio bot/assistente automático\n" +
+    "  → Se só existem essas mensagens após a apresentação do atendente, o cliente NÃO respondeu → use 'sem-especificação'\n" +
+    "\n" +
+    "REGRAS ADICIONAIS:\n" +
+    "- NUNCA use 'sem-especificação' e 'sem-resposta' juntas. São mutuamente exclusivas.\n" +
     "- Se o atendente realizou alguma ação ou resolução técnica, NÃO use essas tags. Classifique pelo serviço realizado.\n\n" +
     "LISTA DE TAGS VÁLIDAS E SUAS DESCRIÇÕES:\n\n" +
     tagsList + "\n\n";
@@ -457,6 +599,98 @@ async function callGemini(chatText, apiKey, learningData, model) {
   };
 }
 
+/**
+ * Chama o agent Toqan para classificação de tags
+ * @param {Array} messages - Array de mensagens (formato: [{role, content}])
+ * @param {String} systemPrompt - Prompt do sistema (contexto)
+ * @param {String} apiKey - Chave de API do Toqan
+ * @param {String} baseUrl - URL Base da API do Toqan
+ * @returns {String} - Resposta do agent (lista de tags)
+ */
+async function callToqan(messages, systemPrompt, apiKey, baseUrl) {
+    try {
+        baseUrl = baseUrl || 'https://api.coco.prod.toqan.ai/api';
+        
+        if (!apiKey) {
+            throw new Error('Toqan API Key não configurada');
+        }
+        
+        // Preparar mensagem combinando system prompt + user message
+        const userMessage = messages.map(m => m.content).join('\n\n');
+        const fullMessage = systemPrompt ? `${systemPrompt}\n\nHISTÓRICO DA CONVERSA:\n${userMessage}` : userMessage;
+        
+        // ETAPA 1: Criar conversa
+        console.log('[Toqan] Criando conversa...');
+        const createResponse = await fetchWithTimeout(
+            `${baseUrl}/create_conversation`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Api-Key': apiKey
+                },
+                body: JSON.stringify({
+                    user_message: fullMessage
+                })
+            },
+            30000 // 30s timeout
+        );
+        
+        if (!createResponse.ok) {
+            throw new Error(`Toqan API erro: ${createResponse.status}`);
+        }
+        
+        const createData = await createResponse.json();
+        const conversationId = createData.conversation_id;
+        const requestId = createData.request_id;
+        
+        console.log(`[Toqan] Conversa criada: ${conversationId}`);
+        
+        // ETAPA 2: Polling para obter resposta
+        let attempts = 0;
+        const maxAttempts = 20; // 20 tentativas * 3s = 60s max
+        
+        while (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Aguardar 3s
+            
+            console.log(`[Toqan] Polling tentativa ${attempts + 1}/${maxAttempts}...`);
+            
+            const pollResponse = await fetchWithTimeout(
+                `${baseUrl}/get_answer?conversation_id=${conversationId}&request_id=${requestId}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'X-Api-Key': apiKey
+                    }
+                },
+                10000 // 10s timeout
+            );
+            
+            if (!pollResponse.ok) {
+                throw new Error(`Toqan polling erro: ${pollResponse.status}`);
+            }
+            
+            const pollData = await pollResponse.json();
+            
+            if (pollData.status === 'finished') {
+                console.log('[Toqan] Resposta recebida!');
+                return pollData.answer || pollData.response || '';
+            } else if (pollData.status === 'error') {
+                throw new Error(`Toqan erro: ${pollData.error || 'Unknown error'}`);
+            }
+            
+            attempts++;
+        }
+        
+        throw new Error('Toqan timeout - resposta não recebida em 60s');
+        
+    } catch (error) {
+        console.error('[Toqan] Erro:', error);
+        throw error;
+    }
+}
+
+
 var ftsStartTime = 0;
 var ftsTimerInterval = null;
 
@@ -536,12 +770,35 @@ function stopConsoleTimer(usageData) {
       var tokens = usageData.tokens;
       var chatText = usageData.chatText;
       
-      var signature = minifyChatText(chatText).substring(0, 100);
-      metrics.analyzedChats = metrics.analyzedChats || [];
+      var chatUrl = window.location.href;
+      metrics.chatHistory = metrics.chatHistory || [];
       
-      if (!metrics.analyzedChats.includes(signature)) {
-        metrics.analyzedChats.push(signature);
-        if (metrics.analyzedChats.length > 500) metrics.analyzedChats.shift();
+      // Deduplication by URL: only count a new entry if this URL was not already recorded
+      var alreadyRecorded = metrics.chatHistory.some(function(entry) {
+        return entry.url === chatUrl;
+      });
+      
+      if (!alreadyRecorded) {
+        var now = new Date();
+        var day = String(now.getDate()).padStart(2, '0');
+        var month = String(now.getMonth() + 1).padStart(2, '0');
+        var year = now.getFullYear();
+        var hours = String(now.getHours()).padStart(2, '0');
+        var minutes = String(now.getMinutes()).padStart(2, '0');
+        var formattedDate = day + '/' + month + '/' + year + ' - ' + hours + ':' + minutes;
+
+        // Extract chat ID from URL: last numeric segment
+        // e.g. /conversation/1147232686537752 → "1147232686537752"
+        var chatIdMatch = chatUrl.match(/\/([\d]+)(?:[\/?#].*)?$/);
+        var chatId = chatIdMatch ? chatIdMatch[1] : '';
+
+        metrics.chatHistory.unshift({
+          url: chatUrl,
+          date: formattedDate,
+          chatId: chatId,
+          timestamp: Date.now()
+        });
+        if (metrics.chatHistory.length > 500) metrics.chatHistory.pop();
         metrics.totalChats = (metrics.totalChats || 0) + 1;
       }
       
@@ -563,12 +820,14 @@ function stopConsoleTimer(usageData) {
   }, 1500);
 }
 
-async function executeAIFallback(chatText, apiKeys, enabledProviders, learningData, customProviders, customModels) {
+async function executeAIFallback(chatText, apiKeys, enabledProviders, learningData, customProviders, customModels, toqanBaseUrl) {
   var queue = [];
   logToConsole("Iniciando motor OmniTag de IA...");
 
   var ALL_PROVIDERS = JSON.parse(JSON.stringify(PROVIDER_MODELS));
-  var providerURLs = {};
+  var providerURLs = {
+    toqan: toqanBaseUrl || 'https://api.coco.prod.toqan.ai/api'
+  };
   
   if (customProviders) {
     Object.keys(customProviders).forEach(function(pid) {
@@ -583,7 +842,7 @@ async function executeAIFallback(chatText, apiKeys, enabledProviders, learningDa
   }
   
   // Define priority order
-  var order = ['gemini', 'groq', 'openrouter'];
+  var order = ['gemini', 'groq', 'openrouter', 'toqan'];
   Object.keys(ALL_PROVIDERS).forEach(function(p) {
     if (order.indexOf(p) === -1) order.push(p);
   });
@@ -630,6 +889,35 @@ async function executeAIFallback(chatText, apiKeys, enabledProviders, learningDa
       var res;
       if (step.provider === 'gemini') {
         res = await callGemini(chatText, step.key, learningData, step.model);
+      } else if (step.provider === 'toqan') {
+        logToConsole("🤖 Tentando TOQAN...");
+        var messages = [{ role: "user", content: minifyChatText(chatText) }];
+        var systemPrompt = getFullPrompt('', learningData);
+        var rawResult = await callToqan(messages, systemPrompt, step.key, step.url);
+        
+        var parsedTags = [];
+        if (rawResult && rawResult.trim()) {
+          try {
+            var cleanResult = rawResult.replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
+            var match = cleanResult.match(/\[.*\]/s);
+            if (match) cleanResult = match[0];
+            parsedTags = mapNamesToTags(JSON.parse(cleanResult));
+          } catch (e) {
+            console.log('[Toqan] Não foi possível parsear resposta como JSON. Tentando extrair por texto.');
+            var lowerResult = rawResult.toLowerCase();
+            tagsData.forEach(function(tagObj) {
+              if (lowerResult.includes(tagObj.name.toLowerCase())) {
+                parsedTags.push(tagObj);
+              }
+            });
+          }
+        }
+        
+        var estimatedTokens = Math.round((chatText.length + rawResult.length) / 4);
+        res = {
+          tags: parsedTags,
+          tokens: estimatedTokens
+        };
       } else {
         res = await callOpenAIFormat(chatText, step.key, learningData, step.provider, step.model, step.url);
       }
@@ -724,13 +1012,19 @@ function createUI() {
     var safeText = censorText(rawText);
     lastChatSummary = safeText;
 
-        chrome.storage.local.get(['apiKeys', 'enabledProviders', 'learningData', 'customProviders', 'customModels'], async function(result) {
+        chrome.storage.local.get(['apiKeys', 'enabledProviders', 'learningData', 'customProviders', 'customModels', 'toqan_base_url'], async function(result) {
       var apiKeys = result.apiKeys || {};
-      var enabledProviders = result.enabledProviders || { gemini: true, groq: true, openrouter: true };
+      var enabledProviders = result.enabledProviders || { gemini: true, groq: true, openrouter: true, toqan: true };
       
-      if (Object.keys(apiKeys).length > 0) {
+      if (result.enabledProviders && result.enabledProviders.toqan === undefined) {
+        enabledProviders.toqan = true;
+      }
+      
+      var hasApiKeys = Object.keys(apiKeys).length > 0;
+      
+      if (hasApiKeys) {
         try {
-          var aiResult = await executeAIFallback(safeText, apiKeys, enabledProviders, result.learningData, result.customProviders, result.customModels);
+          var aiResult = await executeAIFallback(safeText, apiKeys, enabledProviders, result.learningData, result.customProviders, result.customModels, result.toqan_base_url);
           stopConsoleTimer({
             provider: aiResult.provider,
             model: aiResult.model,
@@ -790,7 +1084,7 @@ function createUI() {
       return;
     }
 
-    saveLearningData(lastChatSummary, lastSuggestedTags, actualTags);
+    saveLearningData(lastChatSummary, lastSuggestedTags, actualTags, window.location.href);
     btnLearn.textContent = '\u2705';
     btnLearn.title = 'Aprendizado salvo! Tags: ' + actualTags.join(', ');
     setTimeout(function() {
