@@ -4,6 +4,7 @@ const stopWords = new Set(['de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', '
 // Variáveis globais para o sistema de aprendizado
 var lastSuggestedTags = [];
 var lastChatSummary = "";
+var hasRecordedHitForCurrentChat = false;
 
 function tokenize(text) {
   var cleaned = text.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, " ");
@@ -361,37 +362,61 @@ function readCurrentTagsFromField() {
   return extracted;
 }
 
-function saveLearningData(chatSummary, suggestedTags, actualTags, chatUrl) {
-  var suggestedNames = suggestedTags.map(function(t) { return typeof t === 'string' ? t : t.name; });
-  var actualNames = actualTags.slice();
+function extractChatId(url) {
+  if (!url) return '';
+  // Prioridade 1: /conversation/ID
+  var convMatch = url.match(/\/conversation\/(\d+)/i);
+  if (convMatch) return convMatch[1];
+  
+  // Prioridade 2: /tickets/ID ou /ticket/ID
+  var ticketMatch = url.match(/\/tickets?\/(\d+)/i);
+  if (ticketMatch) return ticketMatch[1];
 
-  // Per-tag accuracy:
-  // A suggested tag is a HIT if the user kept it (it appears in actualTags)
-  // A suggested tag is a MISS if the user removed it (not in actualTags)
-  var hitTags  = suggestedNames.filter(function(tag) { return actualNames.indexOf(tag) !== -1; });
-  var missTags = suggestedNames.filter(function(tag) { return actualNames.indexOf(tag) === -1; });
-  var hitCount  = hitTags.length;
-  var missCount = missTags.length;
+  // Prioridade 3: Último segmento com 5+ dígitos
+  var cleanUrl = url.split(/[?#]/)[0].replace(/\/+$/, '');
+  var parts = cleanUrl.split('/');
+  for (var i = parts.length - 1; i >= 0; i--) {
+    if (/^\d{5,}$/.test(parts[i])) {
+      return parts[i];
+    }
+  }
+  return '';
+}
+
+function saveLearningData(chatSummary, suggestedTags, actualTags, chatUrl) {
+  var suggestedNames = (suggestedTags || []).map(function(t) { return typeof t === 'string' ? t : t.name; });
+  var actualNames = (actualTags || []).slice();
+
+  // Verifica se pelo menos uma tag sugerida pela IA foi aproveitada
+  var matchedTags = suggestedNames.filter(function(tag) { return actualNames.indexOf(tag) !== -1; });
+  var isHit = matchedTags.length > 0;
 
   var entry = {
     chatSummary:   chatSummary.substring(0, 2000),
     suggestedTags: suggestedNames,
     actualTags:    actualNames,
-    hitCount:      hitCount,
-    missCount:     missCount,
+    hitCount:      isHit ? 1 : 0,
+    missCount:     isHit ? 0 : 1,
     chatUrl:       chatUrl || window.location.href,
     timestamp:     Date.now()
   };
 
-  console.log('[OmniTag] Salvando aprendizado — acertos por tag:', hitCount, '| erros:', missCount, entry);
+  console.log('[OmniTag] Salvando aprendizado — isHit:', isHit, entry);
 
   chrome.storage.local.get(['learningData', 'omnitagsMetrics'], function(result) {
     var data = result.learningData || [];
     var metrics = result.omnitagsMetrics || {};
 
-    // Accumulate per-tag totals across all learning sessions
-    metrics.hits   = (metrics.hits   || 0) + hitCount;
-    metrics.misses = (metrics.misses || 0) + missCount;
+    if (isHit) {
+      // Se acertou mas ainda não havia contabilizado via clique no botão de inserir
+      if (!hasRecordedHitForCurrentChat) {
+        metrics.hits = (metrics.hits || 0) + 1;
+        hasRecordedHitForCurrentChat = true;
+      }
+    } else {
+      // Nenhuma tag sugerida foi aproveitada (correção humana total) -> +1 Erro
+      metrics.misses = (metrics.misses || 0) + 1;
+    }
 
     data.push(entry);
     if (data.length > 500) {
@@ -437,7 +462,9 @@ var PROVIDER_MODELS = {
     'nvidia/nemotron-3-super-120b-a12b:free'
   ],
   gemini: [
-    'gemini-2.5-flash'
+    'gemini-2.5-flash',
+    'gemini-3.5-flash',
+    'gemini-3.1-flash-lite'
   ],
   toqan: [
     'toqan-agent'
@@ -787,10 +814,8 @@ function stopConsoleTimer(usageData) {
         var minutes = String(now.getMinutes()).padStart(2, '0');
         var formattedDate = day + '/' + month + '/' + year + ' - ' + hours + ':' + minutes;
 
-        // Extract chat ID from URL: last numeric segment
-        // e.g. /conversation/1147232686537752 → "1147232686537752"
-        var chatIdMatch = chatUrl.match(/\/([\d]+)(?:[\/?#].*)?$/);
-        var chatId = chatIdMatch ? chatIdMatch[1] : '';
+        // Extrai o ID real do chat da URL (ex: /conversation/1166658770879150)
+        var chatId = extractChatId(chatUrl);
 
         metrics.chatHistory.unshift({
           url: chatUrl,
@@ -996,6 +1021,7 @@ function createUI() {
   btn.addEventListener('click', function() {
     btn.innerText = "Lendo...";
     btn.disabled = true;
+    hasRecordedHitForCurrentChat = false; // Reset da flag para novo chat/leitura
     
     // Reseta o console
     var suggestionsDiv = document.getElementById('fts-suggestions');
@@ -1128,6 +1154,18 @@ function findTagsInput() {
 }
 
 function insertTagIntoField(tagName, buttonEl) {
+  // Contabiliza 1 acerto para a IA neste atendimento (se ainda não contabilizado)
+  if (!hasRecordedHitForCurrentChat) {
+    hasRecordedHitForCurrentChat = true;
+    chrome.storage.local.get(['omnitagsMetrics'], function(result) {
+      var metrics = result.omnitagsMetrics || {};
+      metrics.hits = (metrics.hits || 0) + 1;
+      chrome.storage.local.set({ omnitagsMetrics: metrics }, function() {
+        console.log('[OmniTag] 1 Acerto contabilizado pela inserção da tag:', tagName, '| Total Hits:', metrics.hits);
+      });
+    });
+  }
+
   var input = findTagsInput();
 
   if (input) {

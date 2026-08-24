@@ -5,7 +5,7 @@ var DEFAULT_PROVIDERS = {
     name: 'Google Gemini',
     url: '__gemini__',
     keyLink: 'https://aistudio.google.com/app/apikey',
-    models: ['gemini-2.5-flash'],
+    models: ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'],
     builtIn: true
   },
   groq: {
@@ -101,6 +101,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (customModels[id]) {
           currentProviders[id].models = customModels[id];
         }
+        // Assegura que os modelos hardcoded originais sempre estejam presentes
+        DEFAULT_PROVIDERS[id].models.forEach(function(m) {
+          if (currentProviders[id].models.indexOf(m) === -1) {
+            currentProviders[id].models.push(m);
+          }
+        });
       });
       Object.keys(customProviders).forEach(function(id) {
         currentProviders[id] = customProviders[id];
@@ -504,16 +510,16 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('m-hits').textContent = hits;
       document.getElementById('m-misses').textContent = misses;
 
-      // Accuracy — now per-tag: hits = tags kept, misses = tags removed by user
+      // Accuracy — assertividade da IA por atendimento
       var total = hits + misses;
       if (total > 0) {
         var pct = Math.round((hits / total) * 100);
         document.getElementById('m-accuracy').textContent = pct + '%';
         document.getElementById('m-accuracy-sub').textContent =
-          hits + ' tags corretas de ' + total + ' sugeridas';
+          hits + ' de ' + total + ' atendimentos assertivos';
       } else {
         document.getElementById('m-accuracy').textContent = '—';
-        document.getElementById('m-accuracy-sub').textContent = 'clique no 🧠 após corrigir tags para gerar dados';
+        document.getElementById('m-accuracy-sub').textContent = 'nenhuma interação registrada ainda';
       }
 
       // Last provider/model
@@ -527,6 +533,23 @@ document.addEventListener('DOMContentLoaded', function() {
       // Chat history list
       renderChatHistory(metrics.chatHistory || []);
     });
+  }
+
+  // Extrai o ID do Chat da URL (ex: /conversation/1166658770879150)
+  function extractChatId(url) {
+    if (!url) return '';
+    var convMatch = url.match(/\/conversation\/(\d+)/i);
+    if (convMatch) return convMatch[1];
+    var ticketMatch = url.match(/\/tickets?\/(\d+)/i);
+    if (ticketMatch) return ticketMatch[1];
+    var cleanUrl = url.split(/[?#]/)[0].replace(/\/+$/, '');
+    var parts = cleanUrl.split('/');
+    for (var i = parts.length - 1; i >= 0; i--) {
+      if (/^\d{5,}$/.test(parts[i])) {
+        return parts[i];
+      }
+    }
+    return '';
   }
 
   function renderChart(tokensByProvider) {
@@ -558,19 +581,37 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // ==================== CHAT HISTORY MODAL ====================
-  function renderChatHistory(history) {
+  var currentChatHistory = [];
+
+  function renderChatHistory(history, filterQuery) {
+    if (history !== undefined) currentChatHistory = history || [];
     var listEl = document.getElementById('chat-history-list');
     if (!listEl) return;
 
-    if (!history || history.length === 0) {
+    if (!currentChatHistory || currentChatHistory.length === 0) {
       listEl.innerHTML = '<div class="chat-history-empty">Nenhum chat analisado ainda.<br><small>Clique em "Ler Conversa" em um chat do Freshdesk para registrar.</small></div>';
       return;
     }
 
+    var query = (filterQuery || '').trim().toLowerCase();
+    var filtered = currentChatHistory.filter(function(entry) {
+      if (!query) return true;
+      var effectiveId = (extractChatId(entry.url) || entry.chatId || '').toLowerCase();
+      var dateStr = (entry.date || '').toLowerCase();
+      var urlStr = (entry.url || '').toLowerCase();
+      return effectiveId.indexOf(query) !== -1 || dateStr.indexOf(query) !== -1 || urlStr.indexOf(query) !== -1;
+    });
+
+    if (filtered.length === 0) {
+      listEl.innerHTML = '<div class="chat-history-empty">Nenhum chat encontrado para o termo: "<strong>' + escapeHTML(query) + '</strong>"</div>';
+      return;
+    }
+
     var html = '';
-    history.forEach(function(entry, idx) {
-      var idBadge = entry.chatId
-        ? ' <span class="chat-history-id">#' + escapeHTML(entry.chatId) + '</span>'
+    filtered.forEach(function(entry) {
+      var effectiveId = extractChatId(entry.url) || entry.chatId || '';
+      var idBadge = effectiveId
+        ? ' <span class="chat-history-id">#' + escapeHTML(effectiveId) + '</span>'
         : '';
       html += '<a class="chat-history-item" href="' + escapeHTML(entry.url) + '" target="_blank" title="' + escapeHTML(entry.url) + '">' +
         '<span class="chat-history-icon">💬</span>' +
@@ -584,10 +625,22 @@ document.addEventListener('DOMContentLoaded', function() {
   var cardChats = document.getElementById('card-chats-analisados');
   var historyModal = document.getElementById('chat-history-modal');
   var closeHistoryBtn = document.getElementById('close-history-modal');
+  var historySearchInput = document.getElementById('chat-history-search');
+
+  if (historySearchInput) {
+    historySearchInput.addEventListener('input', function(e) {
+      renderChatHistory(currentChatHistory, e.target.value);
+    });
+  }
 
   if (cardChats && historyModal) {
     cardChats.addEventListener('click', function() {
       historyModal.style.display = 'flex';
+      if (historySearchInput) {
+        historySearchInput.value = '';
+        setTimeout(function() { historySearchInput.focus(); }, 50);
+      }
+      renderChatHistory(currentChatHistory, '');
     });
   }
   if (closeHistoryBtn && historyModal) {
@@ -733,9 +786,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!statusHtml)   statusHtml = '<span class="correction-status status-hit">✓ IA acertou tudo</span>';
 
     var bodyEl = document.getElementById('correction-detail-body');
+    var convId = extractChatId(entry.chatUrl);
+    var chatLinkText = convId ? ('🔗 Abrir Chat #' + escapeHTML(convId)) : '🔗 Abrir Chat Original';
     var chatLinkHtml = entry.chatUrl
       ? '<div class="cd-chat-link"><a href="' + escapeHTML(entry.chatUrl) + '" target="_blank" class="cd-link-anchor">' +
-          '🔗 Abrir Chat Original</a></div>'
+          chatLinkText + '</a></div>'
       : '';
 
     bodyEl.innerHTML =
@@ -817,7 +872,7 @@ document.addEventListener('DOMContentLoaded', function() {
         toqan_enabled: result.toqan_enabled || false,
         toqan_base_url: result.toqan_base_url || 'https://api.coco.prod.toqan.ai/api',
         exportedAt: new Date().toISOString(),
-        version: '2.3 Rev 0.2'
+        version: '2.6 Rev 24/08/2026'
       };
 
       var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

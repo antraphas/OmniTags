@@ -212,7 +212,7 @@ const tagsData = [
     "description": "Bugs referentes ao assunto acima."
   },
   {
-    "name": "suporte-sobdemanda",
+    "name": "suporte-sob-demanda",
     "description": "Deve ser usada em todos os casos de chat relacionados à integração Sob Demanda ou a assuntos correlacionados a este tema."
   },
   {
@@ -554,5 +554,21 @@ const tagsData = [
   {
     "name": "tuna-suporte",
     "description": "Instruções ou auxílio referente ao acesso ou alteração de dados na Tuna, ou informações relacionadas a repasses."
+  },
+  {
+    "name": "ifoodpago-crédito",
+    "description": "Utilizar nos casos de questionamentos sobre repasses relacionados ao crédito. Ex: Dúvidas sobre parcelas, valores retidos ou acompanhamento do crédito no app iFood Pago."
+  },
+  {
+    "name": "redesign-kanban",
+    "description": "Utilizar quando o cliente relatar algum feedback sobre a atualização do menu do admin."
+  },
+  {
+    "name": "churn",
+    "description": "Utilizar nos casos de cancelamentos em que o cliente é cancelado diretamente pelo front de atendimento. (200 - pedidos)"
+  },
+  {
+    "name": "duplicado-ou-sem-demanda",
+    "description": "Utilizar quando fica claro, no chat, que o cliente não possui uma demanda ativa a ser tratada."
   }
 ];

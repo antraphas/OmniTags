@@ -979,6 +979,28 @@ input:checked + .slider:before {
   color: var(--text-main);
 }
 
+.modal-history-search {
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+}
+.history-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-main);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s, background 0.15s;
+}
+.history-search-input:focus {
+  border-color: var(--accent-base);
+  background: rgba(255, 255, 255, 0.07);
+}
+
 .modal-history-body {
   overflow-y: auto;
   padding: 10px 12px;

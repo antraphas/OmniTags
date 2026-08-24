@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
   "name": "OmniTag",
-  "version": "2.3",
+  "version": "2.6",
+  "version_name": "2.6 Rev 24/08/2026",
   "description": "Sugere tags para o FreshDesk com base no conteúdo do chat usando IA.",
   "permissions": ["storage", "activeTab"],
   "host_permissions": [
