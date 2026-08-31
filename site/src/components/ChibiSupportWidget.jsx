@@ -24,7 +24,7 @@ export default function ChibiSupportWidget() {
 
   const whatsappNumber = '5521972214420';
   const whatsappFormatted = '(21) 97221-4420';
-  const slackUser = '@RaphaelSuarez';
+  const slackUser = '@Raphael.Suarez';
   const slackUrl = 'https://ifood-global.enterprise.slack.com/team/U0640AJNDEJ';
 
   // Atualiza relógio do smartphone em tempo real
