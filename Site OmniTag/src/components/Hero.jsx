@@ -1,7 +1,7 @@
 import React from 'react';
-import { Download, Sparkles, Zap, ShieldCheck, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Download, Sparkles, Zap, ShieldCheck, ArrowRight, CheckCircle2, Star, MessageSquare } from 'lucide-react';
 
-export default function Hero() {
+export default function Hero({ onOpenAvaliacao, onOpenFeedback }) {
   const downloadUrl = "https://ar8tdiwyhdpyyh2d.public.blob.vercel-storage.com/Downloads/OmniTag%202.6.rar";
 
   return (
@@ -14,7 +14,7 @@ export default function Hero() {
         {/* Internal Badge */}
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-6 shadow-inner">
           <Sparkles size={14} className="text-blue-400" />
-          <span>Ferramenta Interna • Suporte Anota.AI</span>
+          <span>Fase Beta Aberta • Suporte Anota.AI</span>
         </div>
 
         {/* Main Title */}
@@ -30,24 +30,43 @@ export default function Hero() {
           Extensão desenvolvida para apoiar os atendentes no <strong>Freshdesk</strong>, interpretando o contexto da conversa com o restaurante ou cliente e sugerindo as tags corretas com base na taxonomia oficial da <strong>Anota.AI</strong>.
         </p>
 
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+        {/* Main Actions */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 mb-6">
           <a
             href={downloadUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-xl shadow-blue-500/25 transition-all hover:scale-105 active:scale-95 group"
+            className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-xl shadow-blue-500/25 transition-all hover:scale-105 active:scale-95 group"
           >
             <Download size={18} className="group-hover:-translate-y-0.5 transition-transform" />
             <span>Baixar Extensão (.rar)</span>
           </a>
 
+          <button
+            onClick={onOpenAvaliacao}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 hover:from-blue-600/30 hover:to-purple-600/30 border border-blue-500/40 text-blue-200 font-bold text-sm shadow-lg transition-all hover:scale-105 active:scale-95"
+          >
+            <Star size={16} className="text-yellow-400 fill-yellow-400" />
+            <span>Avaliar OmniTag ⭐</span>
+          </button>
+
+          <button
+            onClick={onOpenFeedback}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600/20 to-pink-600/20 hover:from-purple-600/30 hover:to-pink-600/30 border border-purple-500/40 text-purple-200 font-bold text-sm shadow-lg transition-all hover:scale-105 active:scale-95"
+          >
+            <MessageSquare size={16} className="text-pink-400" />
+            <span>Feedback / Relatar Bug 💬</span>
+          </button>
+        </div>
+
+        {/* Link auxiliar */}
+        <div className="mb-12">
           <a
             href="#instalacao"
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl glass-card hover:bg-slate-800/60 text-slate-200 font-semibold text-sm transition-all"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-blue-400 transition-colors"
           >
-            <span>Como Instalar no Navegador</span>
-            <ArrowRight size={16} />
+            <span>Primeira vez aqui? Veja como instalar no navegador</span>
+            <ArrowRight size={13} />
           </a>
         </div>
 

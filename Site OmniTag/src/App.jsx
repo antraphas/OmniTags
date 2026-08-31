@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import DownloadSection from './components/DownloadSection';
@@ -11,8 +11,46 @@ import MetricsAndLearning from './components/MetricsAndLearning';
 import SopSection from './components/SopSection';
 import Features from './components/Features';
 import Footer from './components/Footer';
+import AvaliacaoModal from './components/AvaliacaoModal';
+import FeedbackModal from './components/FeedbackModal';
+import AdminDashboard from './components/AdminDashboard';
 
 export default function App() {
+  const [avaliacaoOpen, setAvaliacaoOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+
+  // Escuta hash na URL ou parâmetros para abrir direto (#avaliacao, #feedback, #admin, /admin, ?page=admin)
+  useEffect(() => {
+    const handleUrlRoute = () => {
+      const hash = window.location.hash.toLowerCase();
+      const params = new URLSearchParams(window.location.search);
+      const pageParam = (params.get('page') || '').toLowerCase();
+      const pathname = window.location.pathname.toLowerCase();
+
+      if (hash === '#admin' || pageParam === 'admin' || pathname.includes('/admin')) {
+        setAdminOpen(true);
+      } else if (hash === '#avaliacao' || pageParam === 'avaliacao' || pathname.includes('/avaliacao')) {
+        setAvaliacaoOpen(true);
+      } else if (hash === '#feedback' || pageParam === 'feedback' || pathname.includes('/feedback')) {
+        setFeedbackOpen(true);
+      }
+    };
+
+    handleUrlRoute();
+    window.addEventListener('hashchange', handleUrlRoute);
+    return () => window.removeEventListener('hashchange', handleUrlRoute);
+  }, []);
+
+  const closeAllModals = () => {
+    setAvaliacaoOpen(false);
+    setFeedbackOpen(false);
+    setAdminOpen(false);
+    if (window.location.hash === '#admin' || window.location.hash === '#avaliacao' || window.location.hash === '#feedback') {
+      window.history.pushState(null, '', window.location.pathname + window.location.search);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#070b14] text-slate-300 font-sans relative selection:bg-blue-600/30 selection:text-white">
       
@@ -26,10 +64,17 @@ export default function App() {
       />
 
       <div className="relative z-10 flex flex-col min-h-screen">
-        <Navbar />
+        <Navbar
+          onOpenAvaliacao={() => setAvaliacaoOpen(true)}
+          onOpenFeedback={() => setFeedbackOpen(true)}
+          onOpenAdmin={() => setAdminOpen(true)}
+        />
         
         <main className="flex-grow space-y-4">
-          <Hero />
+          <Hero
+            onOpenAvaliacao={() => setAvaliacaoOpen(true)}
+            onOpenFeedback={() => setFeedbackOpen(true)}
+          />
           <DownloadSection />
           <InstallGuide />
           <UiDocumentation />
@@ -41,8 +86,30 @@ export default function App() {
           <Features />
         </main>
 
-        <Footer />
+        <Footer
+          onOpenAvaliacao={() => setAvaliacaoOpen(true)}
+          onOpenFeedback={() => setFeedbackOpen(true)}
+          onOpenAdmin={() => setAdminOpen(true)}
+        />
       </div>
+
+      {/* Modais Interativos */}
+      <AvaliacaoModal
+        isOpen={avaliacaoOpen}
+        onClose={closeAllModals}
+      />
+
+      <FeedbackModal
+        isOpen={feedbackOpen}
+        onClose={closeAllModals}
+      />
+
+      {adminOpen && (
+        <AdminDashboard
+          onClose={closeAllModals}
+        />
+      )}
+
     </div>
   );
 }

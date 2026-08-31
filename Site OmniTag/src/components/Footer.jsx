@@ -1,7 +1,7 @@
 import React from 'react';
-import { Download } from 'lucide-react';
+import { Download, Star, MessageSquare, ShieldCheck } from 'lucide-react';
 
-export default function Footer() {
+export default function Footer({ onOpenAvaliacao, onOpenFeedback, onOpenAdmin }) {
   const downloadUrl = "https://ar8tdiwyhdpyyh2d.public.blob.vercel-storage.com/Downloads/OmniTag%202.6.rar";
 
   return (
@@ -21,27 +21,47 @@ export default function Footer() {
               <div className="flex items-center gap-2">
                 <span className="text-base font-bold text-white">OmniTag</span>
                 <span className="text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20">
-                  v2.6
+                  v2.6 Beta
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">Documentação e Guia de Uso Interno • Suporte Anota.AI</p>
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
+          {/* Quick Actions & Forms */}
+          <div className="flex flex-wrap items-center justify-center gap-3.5 text-xs">
+            <button
+              onClick={onOpenAvaliacao}
+              className="text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 font-semibold"
+            >
+              <Star size={13} className="text-yellow-400 fill-yellow-400" />
+              <span>Avaliação</span>
+            </button>
+
+            <span className="text-slate-700">•</span>
+
+            <button
+              onClick={onOpenFeedback}
+              className="text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1 font-semibold"
+            >
+              <MessageSquare size={13} />
+              <span>Feedback / Bugs</span>
+            </button>
+
+            <span className="text-slate-700">•</span>
+
             <a href="#instalacao" className="text-slate-400 hover:text-white transition-colors">
               Instalação
             </a>
+
             <span className="text-slate-700">•</span>
+
             <a href="#setup-api" className="text-slate-400 hover:text-white transition-colors">
               Setup de APIs
             </a>
+
             <span className="text-slate-700">•</span>
-            <a href="#sop-operacao" className="text-slate-400 hover:text-white transition-colors">
-              SOP do Atendente
-            </a>
-            <span className="text-slate-700">•</span>
+
             <a
               href={downloadUrl}
               target="_blank"
@@ -55,9 +75,20 @@ export default function Footer() {
 
         </div>
 
-        {/* Bottom Credits */}
+        {/* Bottom Credits & Secret Admin Link */}
         <div className="border-t border-slate-800/60 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-          <p>© 2026 OmniTag • Uso interno exclusivo do Suporte Anota.AI.</p>
+          <div className="flex items-center gap-2">
+            <p>© 2026 OmniTag • Uso interno exclusivo do Suporte Anota.AI.</p>
+            <span className="text-slate-700">•</span>
+            <button
+              onClick={onOpenAdmin}
+              className="text-slate-600 hover:text-slate-400 transition-colors flex items-center gap-1 font-mono"
+              title="Painel Administrativo do Gestor"
+            >
+              <ShieldCheck size={12} />
+              <span>Área do Gestor</span>
+            </button>
+          </div>
           
           <div className="flex items-center gap-2">
             <span>Desenvolvido por</span>
