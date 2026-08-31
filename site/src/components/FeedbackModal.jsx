@@ -39,6 +39,7 @@ export default function FeedbackModal({ isOpen, onClose, initialCategory = 'bug'
     ideia_beneficio: ''
   });
 
+  const [emailPrefix, setEmailPrefix] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -74,10 +75,22 @@ export default function FeedbackModal({ isOpen, onClose, initialCategory = 'bug'
     setErrorMsg('');
   };
 
+  const handleEmailPrefixChange = (val) => {
+    let clean = val.trim().toLowerCase();
+    if (clean.includes('@')) {
+      clean = clean.split('@')[0];
+    }
+    clean = clean.replace(/\s+/g, '');
+    setEmailPrefix(clean);
+    setFormData(prev => ({ ...prev, email: clean ? `${clean}@ifood.com.br` : '' }));
+    setErrorMsg('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.nome.trim() || !formData.email.trim()) {
-      setErrorMsg('Por favor, preencha seu Nome e E-mail.');
+    const finalEmail = emailPrefix.trim() ? `${emailPrefix.trim()}@ifood.com.br` : '';
+    if (!formData.nome.trim() || !emailPrefix.trim()) {
+      setErrorMsg('Por favor, preencha seu Nome e E-mail corporativo.');
       return;
     }
 
@@ -106,7 +119,7 @@ export default function FeedbackModal({ isOpen, onClose, initialCategory = 'bug'
       const response = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ ...formData, email: finalEmail })
       });
 
       const data = await response.json();
@@ -253,17 +266,23 @@ export default function FeedbackModal({ isOpen, onClose, initialCategory = 'bug'
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                    Seu E-mail Corporativo <span className="text-red-400">*</span>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                    <span>Seu E-mail Corporativo <span className="text-red-400">*</span></span>
+                    <span className="text-[10px] font-mono text-red-400 font-bold">@ifood.com.br</span>
                   </label>
-                  <input
-                    type="email"
-                    required
-                    value={formData.email}
-                    onChange={e => handleChange('email', e.target.value)}
-                    placeholder="Ex: ana.beatriz@anota.ai"
-                    className="w-full bg-[#121829] border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all"
-                  />
+                  <div className="flex items-center w-full bg-[#121829] border border-slate-700/80 rounded-xl overflow-hidden focus-within:border-purple-500 focus-within:ring-1 focus-within:ring-purple-500 transition-all">
+                    <input
+                      type="text"
+                      required
+                      value={emailPrefix}
+                      onChange={e => handleEmailPrefixChange(e.target.value)}
+                      placeholder="nome.sobrenome"
+                      className="w-full bg-transparent px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none"
+                    />
+                    <span className="px-3.5 py-2.5 bg-slate-800/90 border-l border-slate-700/80 text-xs font-mono font-bold text-red-400 select-none shrink-0">
+                      @ifood.com.br
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
