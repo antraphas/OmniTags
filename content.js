@@ -454,11 +454,8 @@ var PROVIDER_MODELS = {
     'llama-3.1-8b-instant'
   ],
   openrouter: [
-    'z-ai/glm-4.5-air:free',
     'openai/gpt-oss-120b:free',
-    'qwen/qwen3-next-80b-a3b-instruct:free',
     'meta-llama/llama-3.3-70b-instruct:free',
-    'qwen/qwen3-coder:free',
     'nvidia/nemotron-3-super-120b-a12b:free'
   ],
   gemini: [
