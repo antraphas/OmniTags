@@ -43,6 +43,18 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleUrlRoute);
   }, []);
 
+  // Trava scroll da página de fundo quando qualquer modal principal estiver aberto
+  useEffect(() => {
+    if (avaliacaoOpen || feedbackOpen || adminOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [avaliacaoOpen, feedbackOpen, adminOpen]);
+
   const closeAllModals = () => {
     setAvaliacaoOpen(false);
     setFeedbackOpen(false);

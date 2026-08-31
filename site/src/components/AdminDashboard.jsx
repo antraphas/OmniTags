@@ -53,6 +53,21 @@ export default function AdminDashboard({ onClose }) {
   const [selectedAvaliacao, setSelectedAvaliacao] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, table, name }
 
+  // Trava scroll da página ao abrir o painel admin e fecha com ESC
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
+
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
     if (!password.trim()) {
