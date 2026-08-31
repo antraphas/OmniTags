@@ -14,6 +14,7 @@ import Footer from './components/Footer';
 import AvaliacaoModal from './components/AvaliacaoModal';
 import FeedbackModal from './components/FeedbackModal';
 import AdminDashboard from './components/AdminDashboard';
+import ChibiSupportWidget from './components/ChibiSupportWidget';
 
 export default function App() {
   const [avaliacaoOpen, setAvaliacaoOpen] = useState(false);
@@ -109,6 +110,9 @@ export default function App() {
           onClose={closeAllModals}
         />
       )}
+
+      {/* Chibi de Suporte Flutuante & Smartphone Contact Modal */}
+      <ChibiSupportWidget />
 
     </div>
   );
