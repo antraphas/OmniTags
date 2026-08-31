@@ -12,10 +12,12 @@ import {
   ChevronRight,
   MessageSquare,
   Send,
-  ShieldCheck
+  ShieldCheck,
+  Bug,
+  Lightbulb
 } from 'lucide-react';
 
-export default function ChibiSupportWidget() {
+export default function ChibiSupportWidget({ onOpenFeedback }) {
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(null); // 'whatsapp' | 'slack' | null
   const [bubbleVisible, setBubbleVisible] = useState(true);
@@ -72,9 +74,9 @@ export default function ChibiSupportWidget() {
 
   const quickMessages = [
     { label: 'Dúvida de Tags', text: 'Olá Raphael! Estou com uma dúvida sobre a categorização de tags no OmniTag.' },
-    { label: 'Relatar Bug', text: 'Olá Raphael! Encontrei um comportamento inesperado/bug no OmniTag.' },
-    { label: 'Nova Ideia', text: 'Olá Raphael! Pensei em uma sugestão de melhoria bem legal para a extensão.' },
-    { label: 'Ajuda Geral', text: 'Olá Raphael! Pode me dar um help aqui com o OmniTag?' }
+    { label: 'Ajuda Geral', text: 'Olá Raphael! Pode me dar um help aqui com o OmniTag?' },
+    { label: 'Dúvida no Freshdesk', text: 'Olá Raphael! Estou no Freshdesk e preciso de uma ajuda com a extensão.' },
+    { label: 'Falar com Raphael', text: 'Olá Raphael! Gostaria de falar diretamente com você sobre o OmniTag.' }
   ];
 
   const getWhatsappUrl = (customText) => {
@@ -254,6 +256,47 @@ export default function ChibiSupportWidget() {
                   <p className="text-[11px] text-slate-300 mt-2.5 leading-relaxed bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-left">
                     👋 <strong>Oi!</strong> Precisa de ajuda com o OmniTag, quer sugerir novas tags ou encontrou algum problema? Fale direto comigo no <strong>WhatsApp</strong> ou <strong>Slack</strong>!
                   </p>
+                </div>
+
+                {/* ======================================================= */}
+                {/* BOTÕES DE FORMULÁRIO: RELATAR BUG & NOVA IDEIA */}
+                {/* ======================================================= */}
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Botão Relatar Bug */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOpen(false);
+                      if (onOpenFeedback) onOpenFeedback('bug');
+                    }}
+                    className="flex items-center gap-2 p-2.5 rounded-2xl bg-gradient-to-r from-red-500/15 via-rose-500/10 to-pink-500/10 hover:from-red-500/25 hover:to-pink-500/20 border border-red-500/30 hover:border-red-500/50 text-left transition-all hover:scale-[1.02] active:scale-95 shadow-md group cursor-pointer"
+                  >
+                    <div className="p-1.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 group-hover:scale-110 transition-transform shrink-0">
+                      <Bug size={16} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white leading-tight">Relatar Bug</div>
+                      <div className="text-[9px] text-red-300/80 font-medium">Abrir form</div>
+                    </div>
+                  </button>
+
+                  {/* Botão Nova Ideia */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOpen(false);
+                      if (onOpenFeedback) onOpenFeedback('ideia');
+                    }}
+                    className="flex items-center gap-2 p-2.5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-orange-500/10 hover:from-amber-500/25 hover:to-yellow-500/20 border border-amber-500/30 hover:border-amber-500/50 text-left transition-all hover:scale-[1.02] active:scale-95 shadow-md group cursor-pointer"
+                  >
+                    <div className="p-1.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 group-hover:scale-110 transition-transform shrink-0">
+                      <Lightbulb size={16} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white leading-tight">Nova Ideia ✨</div>
+                      <div className="text-[9px] text-amber-300/80 font-medium">Sugerir recurso</div>
+                    </div>
+                  </button>
                 </div>
 
                 {/* ======================================================= */}

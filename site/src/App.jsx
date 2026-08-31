@@ -19,7 +19,13 @@ import ChibiSupportWidget from './components/ChibiSupportWidget';
 export default function App() {
   const [avaliacaoOpen, setAvaliacaoOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackCategory, setFeedbackCategory] = useState('bug');
   const [adminOpen, setAdminOpen] = useState(false);
+
+  const handleOpenFeedback = (category = 'bug') => {
+    setFeedbackCategory(category);
+    setFeedbackOpen(true);
+  };
 
   // Escuta hash na URL ou parâmetros para abrir direto (#avaliacao, #feedback, #admin, /admin, ?page=admin)
   useEffect(() => {
@@ -115,6 +121,7 @@ export default function App() {
       <FeedbackModal
         isOpen={feedbackOpen}
         onClose={closeAllModals}
+        initialCategory={feedbackCategory}
       />
 
       {adminOpen && (
@@ -124,7 +131,9 @@ export default function App() {
       )}
 
       {/* Chibi de Suporte Flutuante & Smartphone Contact Modal */}
-      <ChibiSupportWidget />
+      <ChibiSupportWidget
+        onOpenFeedback={handleOpenFeedback}
+      />
 
     </div>
   );

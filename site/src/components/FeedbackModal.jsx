@@ -18,11 +18,11 @@ import {
   HelpCircle
 } from 'lucide-react';
 
-export default function FeedbackModal({ isOpen, onClose }) {
+export default function FeedbackModal({ isOpen, onClose, initialCategory = 'bug' }) {
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
-    categoria: 'bug', // 'bug' | 'erro_ia' | 'interface' | 'ideia'
+    categoria: initialCategory || 'bug', // 'bug' | 'erro_ia' | 'interface' | 'ideia'
     // Bug fields
     bug_tipo: 'Demorou muito (Timeout)',
     bug_descricao: '',
@@ -59,6 +59,13 @@ export default function FeedbackModal({ isOpen, onClose }) {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, onClose]);
+
+  // Sincroniza categoria inicial quando o modal abre
+  React.useEffect(() => {
+    if (isOpen && initialCategory) {
+      setFormData(prev => ({ ...prev, categoria: initialCategory }));
+    }
+  }, [isOpen, initialCategory]);
 
   if (!isOpen) return null;
 
