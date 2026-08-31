@@ -101,39 +101,38 @@ export default function ChibiSupportWidget() {
               </button>
             </div>
 
-            {/* Triângulo indicador do balão apontando para o chibi */}
-            <div className="absolute -bottom-1.5 right-6 w-3 h-3 bg-indigo-900/95 border-r border-b border-blue-400/50 transform rotate-45"></div>
+            {/* Triângulo indicador do balão apontando para a cabeça do chibi */}
+            <div className="absolute -bottom-1.5 right-10 sm:right-12 w-3 h-3 bg-indigo-900/95 border-r border-b border-blue-400/50 transform rotate-45"></div>
           </div>
         )}
 
-        {/* Chibi Trigger Button */}
-        <div className="pointer-events-auto relative group">
+        {/* Chibi Trigger Button (Totalmente Flutuante sem círculo) */}
+        <div className="pointer-events-auto relative group animate-float">
           
-          {/* Anel de Pulso de Atenção */}
-          <div className="absolute -inset-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 rounded-full blur-md opacity-60 group-hover:opacity-100 transition duration-500 group-hover:duration-200 animate-pulse"></div>
+          {/* Brilho sutil atrás do chibi no hover */}
+          <div className="absolute inset-0 bg-gradient-to-t from-blue-500/30 via-indigo-500/20 to-purple-500/30 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none -z-10" />
 
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className={`relative w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-[#0b1021] border-2 ${
-              isOpen ? 'border-purple-400 ring-4 ring-purple-500/30' : 'border-blue-400/90 hover:border-blue-300'
-            } shadow-2xl p-1 flex items-center justify-center transition-all duration-300 transform group-hover:scale-110 active:scale-95`}
-            title="Abrir contato direto com Raphael Suarez"
+            className="relative flex flex-col items-center justify-center bg-transparent border-0 outline-none focus:outline-none p-0 transition-all duration-300 transform group-hover:scale-110 group-hover:-translate-y-1 active:scale-95 cursor-pointer"
+            title="Abrir contato direto com Raphael Suarez (WhatsApp / Slack)"
           >
-            {/* Chibi Image */}
+            {/* Chibi Image Recortada e Flutuante (Tamanho Ampliado ~30%) */}
             <img
               src="/me.png"
               alt="Raphael Suarez Chibi"
-              className="w-full h-full object-contain filter drop-shadow-md rounded-full"
+              className="w-24 sm:w-28 h-auto max-h-32 object-contain filter drop-shadow-[0_10px_22px_rgba(0,0,0,0.8)] group-hover:drop-shadow-[0_12px_28px_rgba(99,102,241,0.6)] transition-all duration-300 select-none"
             />
 
-            {/* Online Status Badge */}
-            <span className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 border-2 border-[#0b1021] rounded-full shadow-sm flex items-center justify-center">
-              <span className="w-1.5 h-1.5 bg-white rounded-full"></span>
+            {/* Online Status Badge sutil ao lado do Chibi */}
+            <span className="absolute bottom-2 right-2 flex items-center justify-center" title="Online no suporte">
+              <span className="animate-ping absolute inline-flex h-3.5 w-3.5 rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-[#070b14] shadow-md"></span>
             </span>
 
-            {/* Notification Bubble / Help Icon */}
+            {/* Notification Badge / Balãozinho */}
             {!isOpen && (
-              <span className="absolute -top-1 -left-1 w-5 h-5 bg-gradient-to-tr from-purple-600 to-pink-500 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center border border-white/40 shadow">
+              <span className="absolute top-1 -left-1 w-5 h-5 bg-gradient-to-tr from-purple-600 to-pink-500 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center border border-white/40 shadow-lg">
                 💬
               </span>
             )}
